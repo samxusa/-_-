@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+__pycache__
+*.pyc
+downloads
+attached_assets
+cookies.txt
+SHUKLAMUSIC/assets/cookies.txt
+node_modules
+dist
+build

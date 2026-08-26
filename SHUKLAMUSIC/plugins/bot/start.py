@@ -56,14 +56,14 @@ from SHUKLAMUSIC.utils.branding import BRAND_NAME, BRAND_LINK
 welcome_db = db.welcome_config 
 
 YUMI_PICS = [
-    "https://files.catbox.moe/ky6ln3.jpg",
-    "https://files.catbox.moe/booqz5.jpg",
-    "https://files.catbox.moe/qlq89x.jpg",
-    "https://files.catbox.moe/ifgkkl.jpg",
-    "https://files.catbox.moe/qm6b0n.jpg",
-    "https://files.catbox.moe/ap3m1t.png",
-    "https://files.catbox.moe/0k863e.png",
-    "https://files.catbox.moe/vp5hg5.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+   "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
 ]
 
 GREET = [
@@ -182,15 +182,15 @@ async def start_pm(client, message: Message, _):
         await asyncio.sleep(0.3)
         await loading_1.edit_text("<b>ᴅɪηɢ ᴅᴏηɢ...❤️‍🔥</b>")
         await asyncio.sleep(0.3)
-        await loading_1.edit_text("𝙽𝙾𝙱𝙸𝚃𝙰")
+        await loading_1.edit_text("ᴀʀᴇꜱ")
         await asyncio.sleep(0.3)
-        await loading_1.edit_text("𝗡𝗢𝗕𝗜𝗧𝗔 𝗫")
+        await loading_1.edit_text("𝗥𝗢𝗦𝗘")
         await asyncio.sleep(0.3)
-        await loading_1.edit_text("𝒩𝑜𝒷𝒾𝓉𝒶 𝒳 𝒫𝓇𝒾𝓂𝑒")
+        await loading_1.edit_text("ᴀʀᴇꜱ x ɢᴏᴅ")
         await asyncio.sleep(0.3)
-        await loading_1.edit_text("𝔑𝔬𝔟𝔦𝔱𝔞 𝔛 𝔓𝔯𝔦𝔪𝔢 ♪")
+        await loading_1.edit_text("🇷‌🇴‌🇸‌🇪‌ 🇲‌🇺‌🇸‌🇮‌🇨‌")
         await asyncio.sleep(0.3)
-        await loading_1.edit_text("<b>ɴᴏʙɪᴛᴀ x ᴘʀɪᴍᴇ ✨</b>")
+        await loading_1.edit_text("<b>ʀᴏꜱᴇ x ᴍᴜꜱɪᴄ ✨</b>")
         await asyncio.sleep(0.3)
         await loading_1.edit_text("<b>sᴛᴀʀᴛᴇᴅ!✨</b>")
         await asyncio.sleep(0.3)
@@ -336,13 +336,13 @@ async def start_pm(client, message: Message, _):
                     await message.reply_text(searched_text, reply_markup=key, disable_web_page_preview=True)
         elif name.startswith("dl_"):
             # ── Download handler — uses download_song/download_video (yt-dlp format-18 fallback) ──
-            m = await message.reply_text("⏬ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ʏᴏᴜʀ sᴏɴɢ, ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ... ❤️‍🔥")
+            m = await message.reply_text("⏬ 𝓭𝓸𝔀𝓷𝓵𝓸𝓪𝓭𝓲𝓷𝓰, 𝓹𝓵𝓮𝓪𝓼𝓮 𝔀𝓪𝓲𝓽... ❤️‍🔥")
             try:
                 from SHUKLAMUSIC.platforms.Youtube import download_song, download_video
                 parts   = name[3:].rsplit("_", 1)
                 vidid   = parts[0]
                 dl_type = parts[1] if len(parts) == 2 else "a"
-                powered = "✦ ᴘᴏᴡᴇʀᴇᴅ ʙʏ » <a href='https://t.me/II_NOBITA_X_PRIME_II'>𝚴 𝐎 𝐁 𝚰 𝐓 𝚲 𝐗 𝚸 𝐑 𝐈 𝐌 𝐄❤️‍🔥</a>"
+                powered = "✦ ᴩᴏᴡᴇʀᴇᴅ ʙʏ  » <a href='https://t.me/ik_ares'—͟͞𝘼𝙍𝙀𝙎 ( 𝙂𝙊𝘿 𝙊𝙁 𝙒𝘼𝙍 )!!</a>"
                 yt_url  = f"https://www.youtube.com/watch?v={vidid}"
 
                 if dl_type == "v":
@@ -359,14 +359,14 @@ async def start_pm(client, message: Message, _):
                     await app.send_video(
                         chat_id=message.chat.id,
                         video=out_file,
-                        caption=f"🎬 <b>HD ᴠɪᴅᴇᴏ — ɴᴏʙɪᴛᴀ 𝗫 ᴘʀɪᴍᴇ ᴍᴜsɪᴄ ʙᴏᴛ</b>\n\n{powered}",
+                        caption=f"🎬 <b>HD ᴠɪᴅᴇᴏ — ʀᴏꜱᴇxᴍᴜsɪᴄ ʙᴏᴛ</b>\n\n{powered}",
                         supports_streaming=True,
                     )
                 else:
                     await app.send_audio(
                         chat_id=message.chat.id,
                         audio=out_file,
-                        caption=f"🎵 <b>HD ᴀᴜᴅɪᴏ — ɴᴏʙɪᴛᴀ 𝗫 ᴘʀɪᴍᴇ ᴍᴜsɪᴄ ʙᴏᴛ</b>\n\n{powered}",
+                        caption=f"🎵 <b>HD ᴀᴜᴅɪᴏ — ʀᴏꜱᴇ 𝗫 ᴍᴜsɪᴄ ʙᴏᴛ</b>\n\n{powered}",
                     )
             except Exception:
                 try:

@@ -1,4 +1,4 @@
-# -_-
+<# -_-
 <div align="center">
 
 <img src="https://files.catbox.moe/43725g.png" width="220">
@@ -13,26 +13,26 @@
 <img src="https://img.shields.io/badge/🤖-BOT-blue?style=for-the-badge">
 </a>
 
-<a href="https://t.me/rosexupdates">
+<a href="https://t.me/aresxcores">
 <img src="https://img.shields.io/badge/📢-UPDATES-red?style=for-the-badge">
 </a>
 
-<a href="https://t.me/rosexsupports">
+<a href="https://t.me/roseysupport">
 <img src="https://img.shields.io/badge/💬-SUPPORT-green?style=for-the-badge">
 </a>
 
-<a href="https://github.com/Techapiders1/Telegram_Music">
+<a href="https://github.com/samxusa/-_-">
 <img src="https://img.shields.io/badge/⭐-GITHUB-black?style=for-the-badge">
 </a>
 
 </p>
 
-<img src="https://img.shields.io/github/stars/Techapiders1/Telegram_Music?style=flat-square">
-<img src="https://img.shields.io/github/forks/Techapiders1/Telegram_Music?style=flat-square">
-<img src="https://img.shields.io/github/license/Techapiders1/Telegram_Music?style=flat-square">
-<img src="https://img.shields.io/github/issues/Techapiders1/Telegram_Music?style=flat-square">
-<img src="https://img.shields.io/github/repo-size/Techapiders1/Telegram_Music?style=flat-square">
-<img src="https://img.shields.io/github/last-commit/Techapiders1/Telegram_Music?style=flat-square">
+<img src="https://img.shields.io/github/stars/samxusa/-_-?style=flat-square">
+<img src="https://img.shields.io/github/forks/samxusa/-_-?style=flat-square">
+<img src="https://img.shields.io/github/license/samxusa/-_-?style=flat-square">
+<img src="https://img.shields.io/github/issues/samxusa/-_-?style=flat-square">
+<img src="https://img.shields.io/github/repo-size/samxusa/-_-?style=flat-square">
+<img src="https://img.shields.io/github/last-commit/samxusa/-_-?style=flat-square">
 
 ---
 
@@ -135,12 +135,12 @@
 | Information | Details |
 |------------|---------|
 | 🌹 Bot Name | Rose X Music |
-| 👑 Owner | EGOISTIC |
+| 👑 Owner | 𝗔𝗥𝗘𝗦 |
 | 🤖 Bot Username | @Rose_X_Musicbot |
-| 💬 Support | https://t.me/rosexsupports |
-| 📢 Updates | https://t.me/rosexupdates |
-| 🌐 GitHub | https://github.com/Techapiders1/Telegram_Music |
-| ❤️ Brand | https://t.me/riskyculsor |
+| 💬 Support | https://t.me/roseysupport |
+| 📢 Updates | https://t.me/aresxcores |
+| 🌐 GitHub | https://github.com/samxusa/-_- |
+| ❤️ Brand | https://t.me/ik_ares |
 
 ---
 
@@ -176,9 +176,9 @@
 
 ## ❤️ Powered By
 
-# 🌹 RISKYCULSOR
+# 🌹 𝗧𝗘𝗖𝗛 𝗦𝗣𝗜𝗗𝗘𝗥𝗦
 
-Made with ❤️‍🔥 by **EGOISTIC**
+Made with ❤️‍🔥 by **𝗔𝗥𝗘𝗦**
 
 </div>
 
@@ -211,7 +211,7 @@ Made with ❤️‍🔥 by **EGOISTIC**
 ## VPS
 
 ```bash
-git clone https://github.com/Techapiders1/Telegram_Music
+git clone https://github.com/samxusa/-_-
 
 cd Telegram_Music
 
@@ -377,7 +377,7 @@ python3 -m SHUKLAMUSIC
 
 ## ❤️‍🔥 RISKYCULSOR
 
-**Made with ❤️‍🔥 by EGOISTIC**
+**Made with ❤️‍🔥 by 𝗔𝗥𝗘𝗦**
 
 </div>
 
@@ -610,11 +610,11 @@ Now every song will stream directly into your **Channel Voice Chat**.
 
 ### ❤️‍🔥 Made With Love By
 
-# **EGOISTIC**
+# **𝗔𝗥𝗘𝗦**
 
 ### Powered By
 
-# **RISKYCULSOR**
+# **𝗧𝗘𝗖𝗛 𝗦𝗣𝗜𝗗𝗘𝗥𝗦**
 
 </div>
 
@@ -631,7 +631,7 @@ https://t.me/roseysupport
 https://t.me/aresxcores
 
 ### 👑 Owner
-**EGOISTIC**
+**𝗔𝗥𝗘𝗦**
 
 Telegram:
 https://t.me/aresxcores
@@ -721,7 +721,7 @@ Repository
 
 Repository URL
 
-https://github.com/Techapiders1/ᴛᴇʟᴇɢʀᴀᴍ_ᴍᴜꜱɪᴄ
+https://github.com/samxusa/-_-
 
 ---
 
@@ -759,6 +759,6 @@ Made for Music Lovers ❤️
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**Made with ❤️‍🔥 — Powered by RISKYCULSOR**
+**Made with ❤️‍🔥 — Powered by 𝗧𝗘𝗖𝗛 𝗦𝗣𝗜𝗗𝗘𝗥𝗦**
 
 </div>

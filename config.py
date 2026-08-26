@@ -36,9 +36,9 @@ API_HASH = getenv("API_HASH", "")
 BOT_TOKEN = getenv("BOT_TOKEN")
 
 # Bot and owner info
-OWNER_USERNAME = getenv("OWNER_USERNAME", "II_NOBITA_X_PRIME_II")
-BOT_USERNAME = getenv("BOT_USERNAME", "RADHA_MUSIC_GMS_op_bot")
-BOT_NAME = getenv("BOT_NAME", "NOBITA X PRIME")
+OWNER_USERNAME = getenv("OWNER_USERNAME", "ik_ares")
+BOT_USERNAME = getenv("BOT_USERNAME", "Rose_x_musicbot")
+BOT_NAME = getenv("BOT_NAME", "˹Rᴏꜱᴇ ꭙ ᴍᴜꜱɪᴄ 🕊")
 ASSUSERNAME = getenv("ASSUSERNAME", "")
 
 # AI Chatbot
@@ -62,14 +62,14 @@ HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
 HEROKU_API_KEY = getenv("HEROKU_API_KEY")
 
 # Git
-UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/dhruvkumarray3-eng/DHRUV_X_RADHA")
-MINIAPP_URL = getenv("MINIAPP_URL", "https://appmusucvitech--daredevildefaul.replit.app")
+UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/samxusa/Tg_music")
+MINIAPP_URL = getenv("MINIAPP_URL", "https://t.me/aresxcores")
 UPSTREAM_BRANCH = getenv("UPSTREAM_BRANCH", "main")
 GIT_TOKEN = getenv("GIT_TOKEN", None)
 
 # Support
-SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/xvilucifer")   # Updates channel
-SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/fragmentiic")         # Support group
+SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/aresxcores")   # Updates channel
+SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/roseysupport")         # Support group
 
 # Assistant settings
 AUTO_LEAVING_ASSISTANT = getenv("AUTO_LEAVING_ASSISTANT", "True")
@@ -119,22 +119,22 @@ SHASHANK_IMG = getenv("SHASHANK_IMG", "https://files.catbox.moe/ky6ln3.jpg").spl
 
 # Rotating start photos (used by start command and home callbacks)
 START_PICS = [
-    "https://files.catbox.moe/ky6ln3.jpg",
-    "https://files.catbox.moe/booqz5.jpg",
-    "https://files.catbox.moe/qlq89x.jpg",
-    "https://files.catbox.moe/ifgkkl.jpg",
-    "https://files.catbox.moe/qm6b0n.jpg",
-    "https://files.catbox.moe/ap3m1t.png",
-    "https://files.catbox.moe/0k863e.png",
-    "https://files.catbox.moe/vp5hg5.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
+    "https://files.catbox.moe/43725g.png",
 ]
 
-PING_VIDEO_URL = getenv("PING_VIDEO_URL", "https://files.catbox.moe/lltsdr.mp4")
+PING_IMAGE_URL = getenv("PING_IMAGE_URL""https://files.catbox.moe/43725g.png")
 
-START_IMG_URL = getenv("START_IMG_URL", "https://files.catbox.moe/ky6ln3.jpg")
-PING_IMG_URL = getenv("PING_IMG_URL", "https://files.catbox.moe/vp5hg5.png")
-PLAYLIST_IMG_URL = getenv("PLAYLIST_IMG_URL", "https://files.catbox.moe/booqz5.jpg")
-STATS_IMG_URL = getenv("STATS_IMG_URL", "https://files.catbox.moe/qlq89x.jpg")
+START_IMG_URL = getenv("START_IMG_URL", "https://files.catbox.moe/43725g.png")
+PING_IMG_URL = getenv("PING_IMG_URL", "https://files.catbox.moe/43725g.png")
+PLAYLIST_IMG_URL = getenv("PLAYLIST_IMG_URL", "https://files.catbox.moe/43725g.png")
+STATS_IMG_URL = getenv("STATS_IMG_URL", "https://files.catbox.moe/43725g.png")
 TELEGRAM_AUDIO_URL = getenv("TELEGRAM_AUDIO_URL", "https://files.catbox.moe/ifgkkl.jpg")
 TELEGRAM_VIDEO_URL = getenv("TELEGRAM_VIDEO_URL", "https://files.catbox.moe/qm6b0n.jpg")
 STREAM_IMG_URL = getenv("STREAM_IMG_URL", "https://files.catbox.moe/ap3m1t.png")

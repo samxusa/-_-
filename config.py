@@ -65,7 +65,11 @@ HEROKU_API_KEY = getenv("HEROKU_API_KEY")
 UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/samxusa/Tg_music")
 MINIAPP_URL = getenv("MINIAPP_URL", "https://t.me/aresxcores")
 UPSTREAM_BRANCH = getenv("UPSTREAM_BRANCH", "main")
-GIT_TOKEN = getenv("GIT_TOKEN", None)
+GIT_TOKEN = (
+    getenv("GIT_TOKEN")
+    or getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
+    or getenv("GITHUB_TOKEN")
+)
 
 # Support
 SUPPORT_CHANNEL = getenv("SUPPORT_CHANNEL", "https://t.me/aresxcores")   # Updates channel
@@ -129,7 +133,8 @@ START_PICS = [
     "https://files.catbox.moe/43725g.png",
 ]
 
-PING_IMAGE_URL = getenv("PING_IMAGE_URL""https://files.catbox.moe/43725g.png")
+PING_IMAGE_URL = getenv("PING_IMAGE_URL", "https://files.catbox.moe/43725g.png")
+PING_VIDEO_URL = getenv("PING_VIDEO_URL", "https://files.catbox.moe/lltsdr.mp4")
 
 START_IMG_URL = getenv("START_IMG_URL", "https://files.catbox.moe/43725g.png")
 PING_IMG_URL = getenv("PING_IMG_URL", "https://files.catbox.moe/43725g.png")

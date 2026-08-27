@@ -39,7 +39,6 @@ pycryptodome
 pydub
 pyfiglet
 pymongo
-pyrogram
 pyshorteners
 python-dotenv
 python-whois
@@ -104,7 +103,6 @@ pycryptodome
 pydub
 pyfiglet
 pymongo
-pyrogram
 pyshorteners
 python-dotenv
 python-whois

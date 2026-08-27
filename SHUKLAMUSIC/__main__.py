@@ -33,7 +33,17 @@ async def start_keepalive():
     await runner.setup()
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
+    try:
+        await site.start()
+    except OSError as ex:
+        await runner.cleanup()
+        if getattr(ex, "errno", None) == 98:
+            LOGGER("SHUKLAMUSIC").warning(
+                f"Keep-alive port {port} is already in use; "
+                "continuing without starting a second HTTP listener."
+            )
+            return
+        raise
     LOGGER("SHUKLAMUSIC").info(f"Keep-alive server started on port {port}")
 
 

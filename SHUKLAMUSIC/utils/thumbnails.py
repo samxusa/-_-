@@ -60,7 +60,9 @@ def trim_to_width(text: str, font: ImageFont.FreeTypeFont, max_w: int) -> str:
     return ellipsis
 
 async def get_thumb(videoid: str) -> str:
-    cache_path = os.path.join(CACHE_DIR, f"{videoid}_v4.png")
+    # Bump the cache key whenever the generated artwork branding changes so
+    # Telegram never receives an older watermark from a previous build.
+    cache_path = os.path.join(CACHE_DIR, f"{videoid}_v5.png")
     if os.path.exists(cache_path):
         return cache_path
 
@@ -151,12 +153,12 @@ async def get_thumb(videoid: str) -> str:
     draw.text((TITLE_X, TITLE_Y), trim_to_width(title, title_font, MAX_TITLE_WIDTH), fill="black", font=title_font)
     draw.text((META_X, META_Y), f"YouTube | {views}", fill="black", font=regular_font)
 
-    # MADE BY-NOBITAXPRIME watermark — right bottom corner
+    # ARES watermark — right bottom corner
     try:
         brand_font = ImageFont.truetype("SHUKLAMUSIC/assets/assets/font2.ttf", 22)
     except OSError:
         brand_font = regular_font
-    brand_text = "MADE BY-NOBITAXPRIME\u2764\ufe0f\u200d\U0001f525"
+    brand_text = "𝗠𝗔𝗗𝗘 𝗕𝗬 𝗔𝗥𝗘𝗦 👻"
     brand_w = int(brand_font.getlength(brand_text)) if hasattr(brand_font, 'getlength') else 220
     brand_x = 1280 - brand_w - 18
     brand_y = 720 - 42

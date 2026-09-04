@@ -57,7 +57,7 @@ def stream_markup_timer(_, chat_id, played, dur, videoid=None, autoplay=False):
     display_dur = dur if (dur and dur not in ("-", "")) else "Live"
 
     # Bar fills proportionally: 12 steps across the full song duration so it
-    # reaches NOBITAXPRIME❤️‍🔥 exactly at the end — works for any song length.
+    # reaches ARES X GOD at the end — works for any song length.
     # step 0 = just started, step 11 = song ≥ 11/12 done (bar fully filled).
     if duration_sec > 0:
         step = min(11, int(played_sec / duration_sec * 12))
@@ -65,18 +65,18 @@ def stream_markup_timer(_, chat_id, played, dur, videoid=None, autoplay=False):
         step = 0
 
     _BARS = [
-        "𝚴❤️‍🔥···········",
-        "𝚴𝐎❤️‍🔥··········",
-        "𝚴𝐎𝐁❤️‍🔥·········",
-        "𝚴𝐎𝐁𝚰❤️‍🔥········",
-        "𝚴𝐎𝐁𝚰𝐓❤️‍🔥·······",
-        "𝚴𝐎𝐁𝚰𝐓𝚲❤️‍🔥······",
-        "𝚴𝐎𝐁𝚰𝐓𝚲𝐗❤️‍🔥·····",
-        "𝚴𝐎𝐁𝚰𝐓𝚲𝐗𝚸❤️‍🔥····",
-        "𝚴𝐎𝐁𝚰𝐓𝚲𝐗𝚸𝐑❤️‍🔥···",
-        "𝚴𝐎𝐁𝚰𝐓𝚲𝐗𝚸𝐑𝐈❤️‍🔥··",
-        "𝚴𝐎𝐁𝚰𝐓𝚲𝐗𝚸𝐑𝐈𝐌❤️‍🔥·",
-        "𝚴𝐎𝐁𝚰𝐓𝚲𝐗𝚸𝐑𝐈𝐌𝐄❤️‍🔥",
+        "𝗔👻···········",
+        "𝗔𝗥👻··········",
+        "𝗔𝗥𝗘👻·········",
+        "𝗔𝗥𝗘𝗦👻········",
+        "𝗔𝗥𝗘𝗦 𝗫👻·······",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚👻······",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚𝗢👻·····",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚𝗢𝗗👻····",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚𝗢𝗗👻···",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚𝗢𝗗👻··",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚𝗢𝗗👻·",
+        "𝗔𝗥𝗘𝗦 𝗫 𝗚𝗢𝗗👻",
     ]
     bar = _BARS[step]
     buttons = [

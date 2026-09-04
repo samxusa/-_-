@@ -40,7 +40,7 @@ class SHUKLA(Client):
         LOGGER(__name__).info("Starting Bot...")
 
         super().__init__(
-            name="NOBITA X PRIME",
+            name="ARES X GOD",
             api_id=config.API_ID,
             api_hash=config.API_HASH,
             bot_token=config.BOT_TOKEN,

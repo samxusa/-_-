@@ -20,7 +20,7 @@ from SHUKLAMUSIC.core.commands import register_bot_commands
 # ── Keep-alive web server ─────────────────────────────────────────────────────
 async def _ping(request):
     return web.Response(
-        text='{"status":"ok","bot":"NOBITA X PRIME"}',
+        text='{"status":"ok","bot":"ARES X GOD"}',
         content_type="application/json",
     )
 

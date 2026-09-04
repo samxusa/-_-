@@ -127,11 +127,14 @@ def _base_ydl_opts(**extra):
         # Format 18 = 360p combined H.264+AAC (no PO token needed from tv_embedded).
         # Falls back to bestaudio when format 18 is unavailable.
         "format": "18/bestaudio[ext=m4a]/bestaudio/best",
+        "socket_timeout": 10,
+        "retries": 1,
+        "fragment_retries": 1,
         "extractor_args": {
             "youtube": {
-                # tv_embedded does NOT require GVS PO tokens — safest client in 2026.
-                # mweb as secondary fallback; android as last resort for format 18.
-                "player_client": ["tv_embedded", "mweb", "android"],
+                # android reliably exposes a combined format in the current
+                # yt-dlp build; mweb remains a fallback when it is available.
+                "player_client": ["android", "mweb"],
             }
         },
     }
@@ -278,40 +281,38 @@ async def download_song(link: str) -> str:
     # ── 2. Download MP3 from ShrutiAPI if not cached ──
     if not (os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 100_000):
         downloaded = False
-        for attempt in range(2):          # 1 retry on failure
+        # API_KEY is optional. Never wait on an endpoint that cannot
+        # authenticate; go straight to yt-dlp when it is not configured.
+        if API_KEY:
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
                         f"{API_URL}/download",
                         params={"url": video_id, "type": "audio", "api_key": API_KEY},
-                        timeout=aiohttp.ClientTimeout(total=25),
+                        timeout=aiohttp.ClientTimeout(total=15),
                     ) as resp:
-                        if resp.status != 200:
-                            break
-                        # Reject non-audio responses (e.g. rate-limit JSON)
-                        content_type = resp.content_type or ""
-                        if not content_type.startswith("audio/"):
-                            break
-                        tmp_dl = mp3_path + ".dl"
-                        with open(tmp_dl, "wb") as f:
-                            async for chunk in resp.content.iter_chunked(131072):
-                                f.write(chunk)
-                        # Require at least 50 KB — real MP3 is always larger
-                        if os.path.exists(tmp_dl) and os.path.getsize(tmp_dl) > 50_000:
-                            os.replace(tmp_dl, mp3_path)
-                            downloaded = True
-                            break
-                        # Too small → not real audio; clean up and fall through
-                        if os.path.exists(tmp_dl):
-                            os.remove(tmp_dl)
-            except Exception:
+                        if resp.status == 200:
+                            # Some download services return octet-stream for
+                            # valid audio, so do not reject it as JSON.
+                            content_type = resp.content_type or ""
+                            if content_type.startswith(("audio/", "application/octet-stream")):
+                                tmp_dl = mp3_path + ".dl"
+                                with open(tmp_dl, "wb") as f:
+                                    async for chunk in resp.content.iter_chunked(131072):
+                                        f.write(chunk)
+                                if os.path.exists(tmp_dl) and os.path.getsize(tmp_dl) > 50_000:
+                                    os.replace(tmp_dl, mp3_path)
+                                    downloaded = True
+                                elif os.path.exists(tmp_dl):
+                                    os.remove(tmp_dl)
+            except Exception as exc:
+                _LOGGER.warning(f"[download_song] API fallback unavailable for {video_id}: {exc}")
+            finally:
                 if os.path.exists(mp3_path + ".dl"):
                     try:
                         os.remove(mp3_path + ".dl")
                     except Exception:
                         pass
-                if attempt == 0:
-                    await asyncio.sleep(2)   # brief pause before retry
 
         # ── 2b. Fallback to yt-dlp if ShrutiAPI failed ──
         if not downloaded or not (os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 50_000):
@@ -325,9 +326,12 @@ async def download_song(link: str) -> str:
                     "-x", "--audio-format", "mp3",
                     "--audio-quality", "0",
                     "--no-playlist",
-                    "--extractor-args", "youtube:player_client=tv_embedded,mweb,android",
+                    "--extractor-args", "youtube:player_client=android,mweb",
                     "--no-check-certificate",
                     "--geo-bypass",
+                    "--socket-timeout", "10",
+                    "--retries", "1",
+                    "--fragment-retries", "1",
                 ]
                 _cookies = _cookies_file()
                 if _cookies:
@@ -338,7 +342,7 @@ async def download_song(link: str) -> str:
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                _, stderr_data = await asyncio.wait_for(proc.communicate(), timeout=300)
+                _, stderr_data = await asyncio.wait_for(proc.communicate(), timeout=90)
                 if proc.returncode != 0 and stderr_data:
                     _LOGGER.warning(
                         f"[download_song] yt-dlp exited {proc.returncode} for {video_id}: "
@@ -387,29 +391,35 @@ async def download_video(link: str) -> str:
     yt_url = f"https://www.youtube.com/watch?v={video_id}" if "youtube" not in link else link
     downloaded = False
 
-    # ── 1. Try ShrutiAPI ──
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{API_URL}/download",
-                params={"url": video_id, "type": "video", "api_key": API_KEY},
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
-                if resp.status == 200:
-                    # Reject non-video responses (e.g. rate-limit JSON)
-                    content_type = resp.content_type or ""
-                    if content_type.startswith("video/"):
-                        tmp_dl = file_path + ".dl"
-                        with open(tmp_dl, "wb") as f:
-                            async for chunk in resp.content.iter_chunked(131072):
-                                f.write(chunk)
-                        if os.path.exists(tmp_dl) and os.path.getsize(tmp_dl) > 100_000:
-                            os.replace(tmp_dl, file_path)
-                            downloaded = True
-                        elif os.path.exists(tmp_dl):
-                            os.remove(tmp_dl)
-    except Exception:
-        pass
+    # ── 1. Try ShrutiAPI only when authenticated ──
+    if API_KEY:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{API_URL}/download",
+                    params={"url": video_id, "type": "video", "api_key": API_KEY},
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp:
+                    if resp.status == 200:
+                        content_type = resp.content_type or ""
+                        if content_type.startswith(("video/", "application/octet-stream")):
+                            tmp_dl = file_path + ".dl"
+                            with open(tmp_dl, "wb") as f:
+                                async for chunk in resp.content.iter_chunked(131072):
+                                    f.write(chunk)
+                            if os.path.exists(tmp_dl) and os.path.getsize(tmp_dl) > 100_000:
+                                os.replace(tmp_dl, file_path)
+                                downloaded = True
+                            elif os.path.exists(tmp_dl):
+                                os.remove(tmp_dl)
+        except Exception as exc:
+            _LOGGER.warning(f"[download_video] API fallback unavailable for {video_id}: {exc}")
+        finally:
+            if os.path.exists(file_path + ".dl"):
+                try:
+                    os.remove(file_path + ".dl")
+                except Exception:
+                    pass
 
     # ── 2. Fallback to yt-dlp ──
     if not downloaded:
@@ -422,9 +432,12 @@ async def download_video(link: str) -> str:
                 "-f", "bestvideo[height<=1080][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
                 "--merge-output-format", "mp4",
                 "--no-playlist",
-                "--extractor-args", "youtube:player_client=tv_embedded,mweb,android",
+            "--extractor-args", "youtube:player_client=android,mweb",
                 "--no-check-certificate",
                 "--geo-bypass",
+            "--socket-timeout", "10",
+            "--retries", "1",
+            "--fragment-retries", "1",
                 # Force yuv420p — prevents blue/green color artifacts in VC streams
                 "--postprocessor-args", "ffmpeg:-pix_fmt yuv420p -vf scale=trunc(iw/2)*2:trunc(ih/2)*2",
             ]

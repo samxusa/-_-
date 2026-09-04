@@ -141,7 +141,11 @@ def PlayWrapper(command):
             userbot = await get_assistant(chat_id)
             try:
                 try:
-                    get = await app.get_chat_member(chat_id, userbot.id)
+                    # Ask the assistant client about its own membership. The
+                    # bot client may not have this user in its peer cache,
+                    # which causes PeerIdInvalid even when the assistant is
+                    # already in the group.
+                    get = await userbot.get_chat_member(chat_id, userbot.id)
                 except ChatAdminRequired:
                     return await message.reply_text(_["call_1"])
                 if (
@@ -160,7 +164,6 @@ def PlayWrapper(command):
                 # ── For channels: bot adds the assistant directly ──
                 if message.command[0][0] == "c":
                     try:
-                        await asyncio.sleep(1)
                         await app.add_chat_members(chat_id, userbot.id)
                         joined = True
                     except UserAlreadyParticipant:
@@ -196,7 +199,6 @@ def PlayWrapper(command):
                             "https://t.me/+", "https://t.me/joinchat/"
                         )
                     try:
-                        await asyncio.sleep(1)
                         await userbot.join_chat(invitelink)
                         joined = True
                     except InviteRequestSent:
@@ -207,7 +209,7 @@ def PlayWrapper(command):
                             return await message.reply_text(
                                 _["call_3"].format(app.mention, type(e).__name__)
                             )
-                        await asyncio.sleep(3)
+                        await asyncio.sleep(1)
                         await myu.edit(_["call_5"].format(app.mention))
                         joined = True
                     except UserAlreadyParticipant:

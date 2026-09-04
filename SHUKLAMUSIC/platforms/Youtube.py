@@ -150,6 +150,7 @@ import aiohttp
 
 API_URL = os.environ.get("API_URL", "https://api01.shrutibots.site")
 API_KEY = os.environ.get("API_KEY", "")
+LOADER_API_URL = "https://loader.to/ajax/download.php"
 
 DOWNLOAD_DIR = "downloads"
 
@@ -265,6 +266,69 @@ def _cleanup_wav_cache(keep: int = 25) -> None:
         pass
 
 
+async def _download_via_loader(
+    video_id: str, format_name: str, output_path: str, minimum_size: int
+) -> bool:
+    """Use loader.to as a last-resort mirror when YouTube blocks yt-dlp."""
+    tmp_path = f"{output_path}.loader"
+    try:
+        timeout = aiohttp.ClientTimeout(total=120, connect=10, sock_read=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(
+                LOADER_API_URL,
+                params={
+                    "format": format_name,
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                },
+            ) as response:
+                if response.status != 200:
+                    return False
+                init = await response.json(content_type=None)
+
+            progress_url = init.get("progress_url")
+            if not progress_url:
+                return False
+
+            download_url = init.get("url")
+            for _ in range(35):
+                if download_url:
+                    break
+                await asyncio.sleep(1)
+                async with session.get(progress_url) as response:
+                    if response.status != 200:
+                        continue
+                    state = await response.json(content_type=None)
+                    if state.get("success") in (1, True):
+                        download_url = state.get("download_url")
+                        break
+
+            if not download_url:
+                return False
+
+            async with session.get(download_url) as response:
+                if response.status != 200:
+                    return False
+                with open(tmp_path, "wb") as output:
+                    async for chunk in response.content.iter_chunked(131072):
+                        output.write(chunk)
+
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) >= minimum_size:
+            os.replace(tmp_path, output_path)
+            _LOGGER.info(
+                f"[loader] downloaded {video_id} as {format_name} via fallback"
+            )
+            return True
+    except Exception as exc:
+        _LOGGER.warning(f"[loader] fallback failed for {video_id}: {exc}")
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+    return False
+
+
 async def download_song(link: str) -> str:
     video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
     if not video_id or len(video_id) < 3:
@@ -365,6 +429,10 @@ async def download_song(link: str) -> str:
                     except Exception:
                         pass
 
+        if not downloaded or not (os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0):
+            downloaded = await _download_via_loader(
+                video_id, "mp3", mp3_path, minimum_size=50_000
+            )
         if not downloaded or not (os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0):
             return None
 
@@ -471,6 +539,11 @@ async def download_video(link: str) -> str:
                     os.remove(f)
                 except Exception:
                     pass
+
+    if not downloaded:
+        downloaded = await _download_via_loader(
+            video_id, "360", file_path, minimum_size=100_000
+        )
 
     if downloaded and os.path.exists(file_path) and os.path.getsize(file_path) > 0:
         return file_path

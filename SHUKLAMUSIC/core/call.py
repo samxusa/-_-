@@ -260,6 +260,20 @@ class Call(PyTgCalls):
         except Exception:
             pass
 
+    async def _continue_after_failed_item(self, client: PyTgCalls, chat_id: int):
+        """Drop one failed queue item and continue without killing the VC."""
+        queue = db.get(chat_id) or []
+        if queue:
+            failed = queue.pop(0)
+            await auto_clean(failed)
+        if queue:
+            return await self.change_stream(client, chat_id)
+        await _clear_(chat_id)
+        try:
+            await client.leave_call(chat_id, close=False)
+        except Exception:
+            pass
+
     async def skip_stream(
         self,
         chat_id: int,
@@ -499,10 +513,20 @@ class Call(PyTgCalls):
                     videoid=True,
                     video=video,
                 )
-            except Exception:
-                return await mystic.edit_text(
-                    _["call_6"], disable_web_page_preview=True
+                if not file_path:
+                    raise ValueError("queued download returned no file")
+            except Exception as exc:
+                LOGGER(__name__).warning(
+                    f"[change_stream] queued item failed for {videoid}: "
+                    f"{type(exc).__name__}: {exc}"
                 )
+                try:
+                    await mystic.edit_text(
+                        _["call_6"], disable_web_page_preview=True
+                    )
+                except Exception:
+                    pass
+                return await self._continue_after_failed_item(client, chat_id)
             stream = self._build_stream(file_path, video=video)
             try:
                 await self._play_on_assistant(client, chat_id, stream)
@@ -644,7 +668,17 @@ class Call(PyTgCalls):
                         types.StreamEnded.Type.AUDIO,
                         types.StreamEnded.Type.VIDEO,
                     ]:
-                        await self.change_stream(_client, update.chat_id)
+                        try:
+                            await self.change_stream(_client, update.chat_id)
+                        except Exception as exc:
+                            LOGGER(__name__).error(
+                                f"[stream-ended] transition failed for "
+                                f"{update.chat_id}: {type(exc).__name__}: {exc}"
+                            )
+                            try:
+                                await self.stop_stream(update.chat_id)
+                            except Exception:
+                                pass
                 elif isinstance(update, types.ChatUpdate):
                     if update.status in [
                         types.ChatUpdate.Status.KICKED,

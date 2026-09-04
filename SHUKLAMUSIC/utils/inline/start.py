@@ -12,7 +12,7 @@
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
 
-from pyrogram.types import InlineKeyboardButton, WebAppInfo
+from pyrogram.types import InlineKeyboardButton
 
 import config
 from pyrogram.enums import ButtonStyle
@@ -102,12 +102,13 @@ def private_panel(_):
             ),
         ],
     ]
-    # NOBITA MUSIC APP button — WebApp when URL configured, URL button otherwise
+    # A Telegram t.me link is not a valid WebApp endpoint. Keep it as a
+    # regular URL button so Telegram accepts the complete welcome keyboard.
     if config.MINIAPP_URL:
         buttons.append([
             InlineKeyboardButton(
                 text=_["S_B_10"],
-                web_app=WebAppInfo(url=config.MINIAPP_URL),
+                url=config.MINIAPP_URL,
                 style=ButtonStyle.PRIMARY,
                 icon_custom_emoji_id=_E_DIAMOND,
             )

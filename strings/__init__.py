@@ -7,8 +7,25 @@ languages = {}
 languages_present = {}
 
 
+def _apply_branding(values):
+    replacements = {
+        "https://t.me/II_NOBITA_X_PRIME_II": "https://t.me/ik_ares",
+        "𝚴 𝐎 𝐁 𝚰 𝐓 𝚲 𝐗 𝚸 𝐑 𝐈 𝐌 𝐄❤️‍🔥": "𝗔𝗥𝗘𝗦",
+        "𝚴 𝐎 𝐁 𝚰 𝐓 𝚲 ❤️‍🔥": "𝗔𝗥𝗘𝗦",
+        "ɴᴏʙɪᴛᴀ 𝗫 ᴘʀɪᴍᴇ ᴍᴜsɪᴄ ʙᴏᴛ": "ʀᴏꜱᴇ x ᴍᴜꜱɪᴄ ʙᴏᴛ",
+        "ɴᴏʙɪᴛᴀ x ᴘʀɪᴍᴇ ᴍᴜsɪᴄ ʙᴏᴛ": "ʀᴏꜱᴇ x ᴍᴜꜱɪᴄ ʙᴏᴛ",
+    }
+    for key, value in values.items():
+        if isinstance(value, str):
+            for old, new in replacements.items():
+                value = value.replace(old, new)
+            values[key] = value
+    values["S_B_10"] = "𝗼𝘄𝗻𝗲𝗿'𝘀 𝗰𝗵𝗼𝗶𝗰𝗲"
+    return values
+
+
 def get_string(lang: str):
-    return languages[lang]
+    return _apply_branding(languages[lang])
 
 
 for filename in os.listdir(r"./strings/langs/"):

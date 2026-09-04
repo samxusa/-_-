@@ -193,7 +193,7 @@ async def song_download_cb(client, cq, lang):
             await app.send_audio(
                 chat_id=cq.message.chat.id,
                 audio=file_path,
-                caption=f"🎵 <b>{title}</b>\n\n© ᴘᴏᴡᴇʀᴇᴅ ʙʏ » <a href=https://t.me/II_NOBITA_X_PRIME_II>𝚴 𝐎 𝐁 𝚰 𝐓 𝚲 ❤️‍🔥</a>",
+                caption=f"🎵 <b>{title}</b>\n\n© ᴘᴏᴡᴇʀᴇᴅ ʙʏ » <a href=https://t.me/ik_ares>𝗔𝗥𝗘𝗦</a>",
                 title=title,
                 performer=uploader,
                 thumb=thumb,
@@ -218,7 +218,7 @@ async def song_download_cb(client, cq, lang):
                 video=file_path,
                 has_spoiler=True,
                 duration=duration_sec,
-                caption=f"🎬 <b>{title}</b>\n\n© ᴘᴏᴡᴇʀᴇᴅ ʙʏ » <a href=https://t.me/II_NOBITA_X_PRIME_II>𝚴 𝐎 𝐁 𝚰 𝐓 𝚲 ❤️‍🔥</a>",
+                caption=f"🎬 <b>{title}</b>\n\n© ᴘᴏᴡᴇʀᴇᴅ ʙʏ » <a href=https://t.me/ik_ares>𝗔𝗥𝗘𝗦</a>",
                 thumb=thumb,
                 supports_streaming=True,
                 reply_to_message_id=cq.message.id,

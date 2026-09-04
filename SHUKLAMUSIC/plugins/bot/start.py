@@ -342,7 +342,7 @@ async def start_pm(client, message: Message, _):
                 parts   = name[3:].rsplit("_", 1)
                 vidid   = parts[0]
                 dl_type = parts[1] if len(parts) == 2 else "a"
-                powered = "✦ ᴩᴏᴡᴇʀᴇᴅ ʙʏ  » <a href='https://t.me/ik_ares'—͟͞𝘼𝙍𝙀𝙎 ( 𝙂𝙊𝘿 𝙊𝙁 𝙒𝘼𝙍 )!!</a>"
+                powered = "✦ ᴘᴏᴡᴇʀᴇᴅ ʙʏ » <a href='https://t.me/ik_ares'>𝗔𝗥𝗘𝗦</a>"
                 yt_url  = f"https://www.youtube.com/watch?v={vidid}"
 
                 if dl_type == "v":

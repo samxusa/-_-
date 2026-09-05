@@ -1,238 +1,103 @@
 # -----------------------------------------------
 # 🔸 StrangerMusic Project
 # 🔹 Developed & Maintained by: Shashank Shukla (https://github.com/itzshukla)
-# 📅 Copyright © 2022 – All Rights Reserved
-#
-# 📖 License:
-# This source code is open for educational and non-commercial use ONLY.
-# You are required to retain this credit in all copies or substantial portions of this file.
-# Commercial use, redistribution, or removal of this notice is strictly prohibited
-# without prior written permission from the author.
-#
-# ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
+import asyncio
+
 from pyrogram import Client
+from pyrogram.errors import FloodWait
+
 import config
 from ..logging import LOGGER
+
 assistants = []
 assistantids = []
 
 
 class Userbot(Client):
     def __init__(self):
-        self.one = Client(
-            name="SHUKLAAss1",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING1),
-            no_updates=True,
+        self.one = Client(name="SHUKLAAss1", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING1), no_updates=True)
+        self.two = Client(name="SHUKLAAss2", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING2), no_updates=True)
+        self.three = Client(name="SHUKLAAss3", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING3), no_updates=True)
+        self.four = Client(name="SHUKLAAss4", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING4), no_updates=True)
+        self.five = Client(name="SHUKLAAss5", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING5), no_updates=True)
+        self.six = Client(name="SHUKLAAss6", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING6), no_updates=True)
+        self.seven = Client(name="SHUKLAAss7", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING7), no_updates=True)
+
+    def _assistant_specs(self):
+        return (
+            (1, self.one, config.STRING1, "One"),
+            (2, self.two, config.STRING2, "Two"),
+            (3, self.three, config.STRING3, "Three"),
+            (4, self.four, config.STRING4, "Four"),
+            (5, self.five, config.STRING5, "Five"),
+            (6, self.six, config.STRING6, "Six"),
+            (7, self.seven, config.STRING7, "Seven"),
         )
-        self.two = Client(
-            name="SHUKLAAss2",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING2),
-            no_updates=True,
-        )
-        self.three = Client(
-            name="SHUKLAAss3",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING3),
-            no_updates=True,
-        )
-        self.four = Client(
-            name="SHUKLAAss4",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING4),
-            no_updates=True,
-        )
-        self.five = Client(
-            name="SHUKLAAss5",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING5),
-            no_updates=True,
-        )
-        self.six = Client(
-            name="SHUKLAAss6",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING6),
-            no_updates=True,
-        )
-        self.seven = Client(
-            name="SHUKLAAss7",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING7),
-            no_updates=True,
-        )
+
+    async def _start_assistant(self, number, client, label):
+        try:
+            await client.start()
+        except FloodWait as exc:
+            wait = getattr(exc, "value", getattr(exc, "x", "unknown"))
+            LOGGER(__name__).error(
+                f"Assistant {label} hit Telegram FloodWait ({wait}s); skipping this assistant."
+            )
+            return False
+        except Exception as exc:
+            LOGGER(__name__).error(
+                f"Assistant {label} failed to start; continuing without it: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return False
+
+        assistants.append(number)
+        client.id = client.me.id
+        client.name = client.me.mention
+        client.username = client.me.username
+        assistantids.append(client.id)
+
+        # Do not join promotional chats or send startup messages automatically.
+        # Those repeated writes were causing FloodWaits with multiple assistants.
+        if config.SEND_ASSISTANT_STARTUP_MESSAGES:
+            try:
+                await client.send_message(config.LOGGER_ID, "Assistant Started")
+            except FloodWait as exc:
+                wait = getattr(exc, "value", getattr(exc, "x", "unknown"))
+                LOGGER(__name__).warning(
+                    f"Assistant {label} startup message rate-limited ({wait}s); continuing."
+                )
+            except Exception as exc:
+                LOGGER(__name__).warning(
+                    f"Assistant {label} cannot access LOGGER_ID: {type(exc).__name__}: {exc}"
+                )
+
+        if not hasattr(self, "id"):
+            self.id = client.id
+            self.name = client.name
+            self.username = client.username
+        LOGGER(__name__).info(f"Assistant {label} Started as {client.name}")
+        return True
 
     async def start(self):
-        LOGGER(__name__).info(f"Starting Assistants...")
-        if config.STRING1:
-            await self.one.start()
-            try:
-                await self.one.join_chat("ITSZSHUKLA")
-                await self.one.join_chat("MASTIWITHFRIENDSXD")
-            except:
-                pass
-            assistants.append(1)
-            try:
-                await self.one.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.one.id = self.one.me.id
-            self.one.name = self.one.me.mention
-            self.one.username = self.one.me.username
-            assistantids.append(self.one.id)
-            LOGGER(__name__).info(f"Assistant Started as {self.one.name}")
-
-        if config.STRING2:
-            await self.two.start()
-            try:
-                await self.two.join_chat("ITSZSHUKLA")
-                await self.one.join_chat("MASTIWITHFRIENDSXD")
-            except:
-                pass
-            assistants.append(2)
-            try:
-                await self.two.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.two.id = self.two.me.id
-            self.two.name = self.two.me.mention
-            self.two.username = self.two.me.username
-            assistantids.append(self.two.id)
-            LOGGER(__name__).info(f"Assistant Two Started as {self.two.name}")
-
-        if config.STRING3:
-            await self.three.start()
-            try:
-                await self.three.join_chat("ITSZSHUKLA")
-                await self.one.join_chat("MASTIWITHFRIENDSXD")
-            except:
-                pass
-            assistants.append(3)
-            try:
-                await self.three.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.three.id = self.three.me.id
-            self.three.name = self.three.me.mention
-            self.three.username = self.three.me.username
-            assistantids.append(self.three.id)
-            LOGGER(__name__).info(f"Assistant Three Started as {self.three.name}")
-
-        if config.STRING4:
-            await self.four.start()
-            try:
-                await self.four.join_chat("ITSZSHUKLA")
-                await self.one.join_chat("MASTIWITHFRIENDSXD")
-            except:
-                pass
-            assistants.append(4)
-            try:
-                await self.four.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.four.id = self.four.me.id
-            self.four.name = self.four.me.mention
-            self.four.username = self.four.me.username
-            assistantids.append(self.four.id)
-            LOGGER(__name__).info(f"Assistant Four Started as {self.four.name}")
-
-        if config.STRING5:
-            await self.five.start()
-            try:
-                await self.five.join_chat("MASTIWITHFRIENDSXD")
-                await self.one.join_chat("ITSZSHUKLA")
-            except:
-                pass
-            assistants.append(5)
-            try:
-                await self.five.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.five.id = self.five.me.id
-            self.five.name = self.five.me.mention
-            self.five.username = self.five.me.username
-            assistantids.append(self.five.id)
-            LOGGER(__name__).info(f"Assistant Five Started as {self.five.name}")
-
-        if config.STRING6:
-            await self.six.start()
-            try:
-                await self.six.join_chat("ITSZSHUKLA")
-            except:
-                pass
-            assistants.append(6)
-            try:
-                await self.six.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.six.id = self.six.me.id
-            self.six.name = self.six.me.mention
-            self.six.username = self.six.me.username
-            assistantids.append(self.six.id)
-            LOGGER(__name__).info(f"Assistant Six Started as {self.six.name}")
-
-        if config.STRING7:
-            await self.seven.start()
-            try:
-                await self.seven.join_chat("ITSZSHUKLA")
-            except:
-                pass
-            assistants.append(7)
-            try:
-                await self.seven.send_message(config.LOGGER_ID, "Assistant Started")
-            except:
-                LOGGER(__name__).warning(
-                    "Assistant cannot access LOGGER_ID; continuing without assistant startup notification. "
-                    "Add the assistant to the log group and promote it if notifications are needed."
-                )
-            self.seven.id = self.seven.me.id
-            self.seven.name = self.seven.me.mention
-            self.seven.username = self.seven.me.username
-            assistantids.append(self.seven.id)
-            LOGGER(__name__).info(f"Assistant Seven Started as {self.seven.name}")
+        LOGGER(__name__).info("Starting Assistants without automatic chat joins...")
+        assistants.clear()
+        assistantids.clear()
+        for number, client, session, label in self._assistant_specs():
+            if not session:
+                continue
+            await self._start_assistant(number, client, label)
+            # Keep Telegram auth/start requests spaced out across sessions.
+            await asyncio.sleep(1)
 
     async def stop(self):
-        LOGGER(__name__).info(f"Stopping Assistants...")
-        try:
-            if config.STRING1:
-                await self.one.stop()
-            if config.STRING2:
-                await self.two.stop()
-            if config.STRING3:
-                await self.three.stop()
-            if config.STRING4:
-                await self.four.stop()
-            if config.STRING5:
-                await self.five.stop()
-            if config.STRING6:
-                await self.six.stop()
-            if config.STRING7:
-                await self.seven.stop()
-        except:
-            pass
+        LOGGER(__name__).info("Stopping Assistants...")
+        for _, client, session, label in self._assistant_specs():
+            if not session:
+                continue
+            try:
+                await client.stop()
+            except Exception as exc:
+                LOGGER(__name__).warning(
+                    f"Assistant {label} stop failed: {type(exc).__name__}: {exc}"
+                )

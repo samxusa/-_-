@@ -11,13 +11,22 @@
 #
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
-from git import Repo
-from git.exc import GitCommandError, InvalidGitRepositoryError
 import config
 from ..logging import LOGGER
 
 
 def git():
+    # Git sync is optional in Railway/container deployments. Import GitPython
+    # lazily so a broken or unavailable Git client cannot stop bot startup.
+    try:
+        from git import Repo
+        from git.exc import GitCommandError, InvalidGitRepositoryError
+    except Exception as exc:
+        LOGGER(__name__).warning(
+            f"Git client unavailable; skipping upstream sync: {type(exc).__name__}: {exc}"
+        )
+        return
+
     REPO_LINK = config.UPSTREAM_REPO
     if config.GIT_TOKEN:
         GIT_USERNAME = REPO_LINK.split("com/")[1].split("/")[0]
@@ -36,4 +45,9 @@ def git():
         # independent of the Git CLI and package manager.
         LOGGER(__name__).warning(
             "Git metadata not found; skipping upstream sync."
+        )
+
+    except Exception as exc:
+        LOGGER(__name__).warning(
+            f"Git sync unavailable; continuing startup: {type(exc).__name__}: {exc}"
         )

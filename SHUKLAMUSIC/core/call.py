@@ -21,7 +21,7 @@ from pyrogram.types import InlineKeyboardMarkup
 from pytgcalls import PyTgCalls, exceptions, types
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 import config
-from SHUKLAMUSIC import LOGGER, YouTube, app
+from SHUKLAMUSIC import LOGGER, YouTube, app, userbot
 from SHUKLAMUSIC.misc import db
 from SHUKLAMUSIC.utils.database import (
     add_active_chat,
@@ -58,44 +58,18 @@ class Call(PyTgCalls):
     def __init__(self):
         PyTgCallsSession.notice_displayed = True
 
-        self.userbot1 = Client(
-            name="SHUKLAAss1",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING1),
-        )
+        # Reuse the already-started assistant clients. Creating a second
+        # Pyrogram client for the same session causes duplicate auth/update
+        # streams and breaks queue transitions.
+        self.userbot1 = userbot.one
         self.one = PyTgCalls(self.userbot1, cache_duration=100)
-
-        self.userbot2 = Client(
-            name="SHUKLAAss2",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING2),
-        )
+        self.userbot2 = userbot.two
         self.two = PyTgCalls(self.userbot2, cache_duration=100)
-
-        self.userbot3 = Client(
-            name="SHUKLAAss3",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING3),
-        )
+        self.userbot3 = userbot.three
         self.three = PyTgCalls(self.userbot3, cache_duration=100)
-
-        self.userbot4 = Client(
-            name="SHUKLAAss4",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING4),
-        )
+        self.userbot4 = userbot.four
         self.four = PyTgCalls(self.userbot4, cache_duration=100)
-
-        self.userbot5 = Client(
-            name="SHUKLAAss5",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            session_string=str(config.STRING5),
-        )
+        self.userbot5 = userbot.five
         self.five = PyTgCalls(self.userbot5, cache_duration=100)
 
     def _build_stream(

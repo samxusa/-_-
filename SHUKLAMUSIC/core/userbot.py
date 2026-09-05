@@ -16,13 +16,13 @@ assistantids = []
 
 class Userbot(Client):
     def __init__(self):
-        self.one = Client(name="SHUKLAAss1", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING1), no_updates=True)
-        self.two = Client(name="SHUKLAAss2", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING2), no_updates=True)
-        self.three = Client(name="SHUKLAAss3", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING3), no_updates=True)
-        self.four = Client(name="SHUKLAAss4", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING4), no_updates=True)
-        self.five = Client(name="SHUKLAAss5", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING5), no_updates=True)
-        self.six = Client(name="SHUKLAAss6", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING6), no_updates=True)
-        self.seven = Client(name="SHUKLAAss7", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING7), no_updates=True)
+        self.one = Client(name="SHUKLAAss1", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING1))
+        self.two = Client(name="SHUKLAAss2", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING2))
+        self.three = Client(name="SHUKLAAss3", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING3))
+        self.four = Client(name="SHUKLAAss4", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING4))
+        self.five = Client(name="SHUKLAAss5", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING5))
+        self.six = Client(name="SHUKLAAss6", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING6))
+        self.seven = Client(name="SHUKLAAss7", api_id=config.API_ID, api_hash=config.API_HASH, session_string=str(config.STRING7))
 
     def _assistant_specs(self):
         return (

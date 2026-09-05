@@ -78,6 +78,7 @@ SUPPORT_CHAT = getenv("SUPPORT_CHAT", "https://t.me/roseysupport")         # Sup
 # Assistant settings
 AUTO_LEAVING_ASSISTANT = getenv("AUTO_LEAVING_ASSISTANT", "True")
 AUTO_LEAVE_ASSISTANT_TIME = _int_env("ASSISTANT_LEAVE_TIME", 9000)
+SEND_ASSISTANT_STARTUP_MESSAGES = getenv("SEND_ASSISTANT_STARTUP_MESSAGES", "False").lower() == "true"
 
 
 # Server limits and configurations - These can be set based on your server configurations

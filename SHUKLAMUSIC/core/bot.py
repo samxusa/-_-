@@ -30,6 +30,7 @@ if sys.platform != "win32":
         print("⚠ uvloop not installed, using default asyncio loop")
 
 from pyrogram import Client, errors
+from pyrogram.errors import FloodWait
 from pyrogram.enums import ChatMemberStatus
 import config
 from ..logging import LOGGER
@@ -44,12 +45,25 @@ class SHUKLA(Client):
             api_id=config.API_ID,
             api_hash=config.API_HASH,
             bot_token=config.BOT_TOKEN,
-            in_memory=True,
+            # Persist the authorization session so normal restarts do not
+            # call auth.ImportBotAuthorization again.
             max_concurrent_transmissions=7,
         )
 
     async def start(self):
-        await super().start()
+        # Telegram rate-limits repeated bot authorization attempts. Keep the
+        # process alive instead of crashing into a Railway restart loop.
+        while True:
+            try:
+                await super().start()
+                break
+            except FloodWait as exc:
+                wait = max(int(getattr(exc, "value", 1)), 1)
+                LOGGER(__name__).error(
+                    f"Telegram bot authorization is rate-limited for {wait}s; "
+                    "holding this process instead of restarting."
+                )
+                await asyncio.sleep(wait + 5)
 
         me = await self.get_me()
 

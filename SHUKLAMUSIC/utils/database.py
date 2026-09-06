@@ -127,6 +127,8 @@ async def get_assistant(chat_id: int) -> str:
 async def set_calls_assistant(chat_id):
     from SHUKLAMUSIC.core.userbot import assistants
 
+    if not assistants:
+        raise RuntimeError("No assistant session is currently available")
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
     await assdb.update_one(

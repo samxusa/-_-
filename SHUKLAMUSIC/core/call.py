@@ -632,16 +632,27 @@ class Call(PyTgCalls):
 
     async def start(self):
         LOGGER(__name__).info("Starting PyTgCalls Client...\n")
-        if config.STRING1:
-            await self.one.start()
-        if config.STRING2:
-            await self.two.start()
-        if config.STRING3:
-            await self.three.start()
-        if config.STRING4:
-            await self.four.start()
-        if config.STRING5:
-            await self.five.start()
+        for label, configured, client in (
+            ("One", config.STRING1, self.one),
+            ("Two", config.STRING2, self.two),
+            ("Three", config.STRING3, self.three),
+            ("Four", config.STRING4, self.four),
+            ("Five", config.STRING5, self.five),
+        ):
+            if not configured:
+                continue
+            try:
+                await asyncio.wait_for(client.start(), timeout=45)
+            except asyncio.TimeoutError:
+                LOGGER(__name__).error(
+                    f"PyTgCalls assistant {label} startup timed out; "
+                    "continuing with other assistants."
+                )
+            except Exception as exc:
+                LOGGER(__name__).error(
+                    f"PyTgCalls assistant {label} failed to start: "
+                    f"{type(exc).__name__}: {exc}"
+                )
 
     async def decorators(self):
         for string, client in [

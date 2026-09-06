@@ -221,7 +221,12 @@ async def _convert_to_wav(mp3_path: str) -> str:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=45)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return mp3_path
 
             if os.path.exists(tmp) and os.path.getsize(tmp) > 0:
                 os.replace(tmp, wav)       # atomic rename
@@ -272,7 +277,7 @@ async def _download_via_loader(
     """Use loader.to as a last-resort mirror when YouTube blocks yt-dlp."""
     tmp_path = f"{output_path}.loader"
     try:
-        timeout = aiohttp.ClientTimeout(total=120, connect=10, sock_read=30)
+        timeout = aiohttp.ClientTimeout(total=45, connect=10, sock_read=20)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(
                 LOADER_API_URL,
@@ -290,7 +295,7 @@ async def _download_via_loader(
                 return False
 
             download_url = init.get("url")
-            for _ in range(35):
+            for _ in range(20):
                 if download_url:
                     break
                 await asyncio.sleep(1)
@@ -740,7 +745,9 @@ class YouTubeAPI:
         # ── 2. Fallback: youtube-search-python ────────────────────────────────
         try:
             results = VideosSearch(link, limit=1)
-            result_list = (await results.next()).get("result") or []
+            result_list = (
+                await asyncio.wait_for(results.next(), timeout=15)
+            ).get("result") or []
             if result_list:
                 r = result_list[0]
                 track_details = {
@@ -773,7 +780,10 @@ class YouTubeAPI:
             return None, None
 
         loop = asyncio.get_event_loop()
-        track_details, vidid = await loop.run_in_executor(None, _ytdlp_search)
+        track_details, vidid = await asyncio.wait_for(
+            loop.run_in_executor(None, _ytdlp_search),
+            timeout=30,
+        )
         if track_details:
             return track_details, vidid
 

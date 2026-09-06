@@ -37,7 +37,12 @@ class Userbot(Client):
 
     async def _start_assistant(self, number, client, label):
         try:
-            await client.start()
+            await asyncio.wait_for(client.start(), timeout=45)
+        except asyncio.TimeoutError:
+            LOGGER(__name__).error(
+                f"Assistant {label} startup timed out after 45s; skipping it."
+            )
+            return False
         except FloodWait as exc:
             wait = getattr(exc, "value", getattr(exc, "x", "unknown"))
             LOGGER(__name__).error(

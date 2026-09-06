@@ -12,6 +12,7 @@
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
 import asyncio
+import config
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.errors import (
     ChannelInvalid,
@@ -44,7 +45,10 @@ links = {}
 
 def PlayWrapper(command):
     async def wrapper(client, message):
-        language = await get_lang(message.chat.id)
+        language, maintenance = await asyncio.gather(
+            get_lang(message.chat.id),
+            is_maintenance(),
+        )
         _ = get_string(language)
         if message.sender_chat:
             from pyrogram.enums import ButtonStyle as _BS
@@ -68,7 +72,7 @@ def PlayWrapper(command):
             )
             return await message.reply_text(_["general_3"], reply_markup=upl)
 
-        if await is_maintenance() is False:
+        if maintenance is False:
             if message.from_user.id not in SUDOERS:
                 return await message.reply_text(
                     text=f"{app.mention} ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ, ᴠɪsɪᴛ <a href={SUPPORT_CHAT}>sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ</a> ғᴏʀ ᴋɴᴏᴡɪɴɢ ᴛʜᴇ ʀᴇᴀsᴏɴ.",
@@ -102,28 +106,38 @@ def PlayWrapper(command):
                     caption=_["play_18"],
                     reply_markup=InlineKeyboardMarkup(buttons),
                 )
+        status = await message.reply_text(_["play_1"])
+
+        async def _status_reply(text, **kwargs):
+            try:
+                return await status.edit_text(text, **kwargs)
+            except Exception:
+                return await message.reply_text(text, **kwargs)
+
         if message.command[0][0] == "c":
             chat_id = await get_cmode(message.chat.id)
             if chat_id is None:
-                return await message.reply_text(_["setting_7"])
+                return await _status_reply(_["setting_7"])
             try:
                 chat = await app.get_chat(chat_id)
             except:
-                return await message.reply_text(_["cplay_4"])
+                return await _status_reply(_["cplay_4"])
             channel = chat.title
         else:
             chat_id = message.chat.id
             channel = None
-        playmode = await get_playmode(message.chat.id)
-        playty = await get_playtype(message.chat.id)
+        playmode, playty = await asyncio.gather(
+            get_playmode(message.chat.id),
+            get_playtype(message.chat.id),
+        )
         if playty != "Everyone":
             if message.from_user.id not in SUDOERS:
                 admins = adminlist.get(message.chat.id)
                 if not admins:
-                    return await message.reply_text(_["admin_13"])
+                    return await _status_reply(_["admin_13"])
                 else:
                     if message.from_user.id not in admins:
-                        return await message.reply_text(_["play_4"])
+                        return await _status_reply(_["play_4"])
         if message.command[0][0] == "v":
             video = True
         else:
@@ -131,14 +145,15 @@ def PlayWrapper(command):
                 video = True
             else:
                 video = True if message.command[0][1] == "v" else None
+        active_chat = await is_active_chat(chat_id)
         if message.command[0][-1] == "e":
-            if not await is_active_chat(chat_id):
-                return await message.reply_text(_["play_16"])
+            if not active_chat:
+                return await _status_reply(_["play_16"])
             fplay = True
         else:
             fplay = None
 
-        if not await is_active_chat(chat_id):
+        if not active_chat:
             userbot = await get_assistant(chat_id)
             try:
                 try:
@@ -148,12 +163,12 @@ def PlayWrapper(command):
                     # already in the group.
                     get = await userbot.get_chat_member(chat_id, userbot.id)
                 except ChatAdminRequired:
-                    return await message.reply_text(_["call_1"])
+                    return await _status_reply(_["call_1"])
                 if (
                     get.status == ChatMemberStatus.BANNED
                     or get.status == ChatMemberStatus.RESTRICTED
                 ):
-                    return await message.reply_text(
+                    return await _status_reply(
                         _["call_2"].format(
                             app.mention, userbot.id, userbot.name, userbot.username
                         ), reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text= "๏ 𝗨ɴʙᴀɴ 𝗔ssɪsᴛᴀɴᴛ ๏", callback_data=f"unban_assistant")]])
@@ -188,10 +203,10 @@ def PlayWrapper(command):
                                 invitelink = await app.export_chat_invite_link(chat_id)
                             except ChatAdminRequired:
                                 await myu.delete()
-                                return await message.reply_text(_["call_1"])
+                                return await _status_reply(_["call_1"])
                             except Exception as e:
                                 await myu.delete()
-                                return await message.reply_text(
+                                return await _status_reply(
                                     _["call_3"].format(app.mention, type(e).__name__)
                                 )
 
@@ -207,7 +222,7 @@ def PlayWrapper(command):
                             await app.approve_chat_join_request(chat_id, userbot.id)
                         except Exception as e:
                             await myu.delete()
-                            return await message.reply_text(
+                            return await _status_reply(
                                 _["call_3"].format(app.mention, type(e).__name__)
                             )
                         await asyncio.sleep(1)
@@ -217,7 +232,7 @@ def PlayWrapper(command):
                         joined = True
                     except Exception as e:
                         await myu.delete()
-                        return await message.reply_text(
+                        return await _status_reply(
                             _["call_3"].format(app.mention, type(e).__name__)
                         )
 
@@ -243,6 +258,7 @@ def PlayWrapper(command):
             playmode,
             url,
             fplay,
+            status_message=status,
         )
 
     return wrapper

@@ -7,7 +7,7 @@ import "./styles.css";
 
 const BASE = import.meta.env.BASE_URL;
 const scenes = [
-  { kicker:"THE BOT THAT RUNS THE ROOM", title:"NOBITA X PRIME", sub:"Music. AI. Absolute control.", tone:"hero" },
+  { kicker:"THE BOT THAT RUNS THE ROOM", title:"ARES", sub:"Music. AI. Absolute control.", tone:"hero" },
   { kicker:"YOUR ENTIRE SOUNDTRACK", title:"PLAY ANYTHING.", sub:"YouTube · Spotify · Apple Music · SoundCloud — directly in Telegram voice chat.", tone:"music" },
   { kicker:"CONTROL THE ENERGY", title:"NO DEAD AIR.", sub:"Back. Pause. Resume. Skip. Stop. Seek.", tone:"controls" },
   { kicker:"THE QUEUE THAT THINKS AHEAD", title:"AUTOPLAY + LOOP", sub:"Related tracks keep the room moving. Loop the one that hits.", tone:"queue" },
@@ -24,7 +24,7 @@ const featureGroups = [
 ];
 
 function Wordmark({ small=false }: {small?:boolean}) {
-  return <div className={small ? "wordmark small" : "wordmark"}><span>NOBITA X</span><b>PRIME</b><i>❤️‍🔥</i></div>;
+  return <div className={small ? "wordmark small" : "wordmark"}><span>ARES</span></b><i>❤️‍🔥</i></div>;
 }
 
 const SCENE_DURATIONS = { s0:7200, s1:7200, s2:7200, s3:7200, s4:7200, s5:7200, s6:7200 };
@@ -49,7 +49,7 @@ function App() {
         <SceneArt scene={scene} />
       </motion.section>
     </AnimatePresence>
-    <footer><div className="progress"><motion.div animate={{ width:`${((scene+1)/scenes.length)*100}%` }} transition={{ duration:.6 }} /></div><div className="footer-label">NOBITA X PRIME MUSIC BOT <span>•</span> @NOBITAXPRIME</div><div className="controls"><button onClick={()=>setScene((scene+scenes.length-1)%scenes.length)}><ChevronLeft /></button><button onClick={()=>setScene((scene+1)%scenes.length)}><ChevronRight /></button></div></footer>
+    <footer><div className="progress"><motion.div animate={{ width:`${((scene+1)/scenes.length)*100}%` }} transition={{ duration:.6 }} /></div><div className="footer-label">ARES MUSIC BOT <span>•</span> @ARES</div><div className="controls"><button onClick={()=>setScene((scene+scenes.length-1)%scenes.length)}><ChevronLeft /></button><button onClick={()=>setScene((scene+1)%scenes.length)}><ChevronRight /></button></div></footer>
   </main>;
 }
 

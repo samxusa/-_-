@@ -13,6 +13,7 @@
 # -----------------------------------------------
 import asyncio
 import os
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Union
 from ntgcalls import ConnectionNotFound, TelegramServerError
@@ -71,6 +72,10 @@ class Call(PyTgCalls):
         self.four = PyTgCalls(self.userbot4, cache_duration=100)
         self.userbot5 = userbot.five
         self.five = PyTgCalls(self.userbot5, cache_duration=100)
+        # A stream-ended callback and a manual /skip can arrive together.
+        # Serialize transitions per chat so they cannot pop/clear the queue
+        # twice and make the assistant leave an otherwise healthy VC.
+        self._transition_locks = defaultdict(asyncio.Lock)
 
     def _build_stream(
         self,
@@ -240,7 +245,7 @@ class Call(PyTgCalls):
             failed = queue.pop(0)
             await auto_clean(failed)
         if queue:
-            return await self.change_stream(client, chat_id)
+            return await self._change_stream(client, chat_id)
         await _clear_(chat_id)
         try:
             await client.leave_call(chat_id, close=False)
@@ -254,9 +259,25 @@ class Call(PyTgCalls):
         video: Union[bool, str] = None,
         image: Union[bool, str] = None,
     ):
-        assistant = await group_assistant(self, chat_id)
-        stream = self._build_stream(link, video=bool(video))
-        await self._play_on_assistant(assistant, chat_id, stream)
+        async with self._transition_locks[chat_id]:
+            assistant = await group_assistant(self, chat_id)
+            stream = self._build_stream(link, video=bool(video))
+            last_exc = None
+            for attempt in range(1, 4):
+                try:
+                    await self._play_on_assistant(assistant, chat_id, stream)
+                    return
+                except exceptions.NoActiveGroupCall:
+                    raise
+                except (ConnectionNotFound, TelegramServerError) as exc:
+                    last_exc = exc
+                except Exception as exc:
+                    last_exc = exc
+                if attempt < 3:
+                    await asyncio.sleep(attempt)
+                    stream = self._build_stream(link, video=bool(video))
+            if last_exc:
+                raise last_exc
 
     async def seek_stream(self, chat_id, file_path, to_seek, duration, mode):
         assistant = await group_assistant(self, chat_id)
@@ -344,7 +365,14 @@ class Call(PyTgCalls):
                 autoend[chat_id] = datetime.now() + timedelta(minutes=1)
 
     async def change_stream(self, client: PyTgCalls, chat_id: int):
-        check = db.get(chat_id)
+        """Advance one queue item, with one transition at a time per chat."""
+        async with self._transition_locks[chat_id]:
+            return await self._change_stream(client, chat_id)
+
+    async def _change_stream(self, client: PyTgCalls, chat_id: int):
+        check = db.get(chat_id) or []
+        if not check:
+            return
         popped = None
         loop = await get_loop(chat_id)
         try:
@@ -425,8 +453,14 @@ class Call(PyTgCalls):
                         # autoplay failed → fall through and leave normally
                 await _clear_(chat_id)
                 return await client.leave_call(chat_id, close=False)
-        except Exception:
+        except Exception as exc:
+            LOGGER(__name__).warning(
+                f"[change_stream] transition failed for {chat_id}: "
+                f"{type(exc).__name__}: {exc}"
+            )
             try:
+                if db.get(chat_id):
+                    return await self._continue_after_failed_item(client, chat_id)
                 await _clear_(chat_id)
                 return await client.leave_call(chat_id, close=False)
             except Exception:
@@ -450,18 +484,12 @@ class Call(PyTgCalls):
         if "live_" in queued:
             n, link = await YouTube.video(videoid, True)
             if n == 0:
-                return await app.send_message(
-                    original_chat_id,
-                    text=_["call_6"],
-                )
+                return await self._continue_after_failed_item(client, chat_id)
             stream = self._build_stream(link, video=video)
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
-                return await app.send_message(
-                    original_chat_id,
-                    text=_["call_6"],
-                )
+                return await self._continue_after_failed_item(client, chat_id)
             img = await gen_thumb(videoid)
             button = stream_markup(_, chat_id, videoid)
             run = await app.send_photo(
@@ -504,10 +532,7 @@ class Call(PyTgCalls):
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
-                return await app.send_message(
-                    original_chat_id,
-                    text=_["call_6"],
-                )
+                return await self._continue_after_failed_item(client, chat_id)
             img = await gen_thumb(videoid)
             button = stream_markup(_, chat_id, videoid)
             await mystic.delete()
@@ -530,10 +555,7 @@ class Call(PyTgCalls):
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
-                return await app.send_message(
-                    original_chat_id,
-                    text=_["call_6"],
-                )
+                return await self._continue_after_failed_item(client, chat_id)
             button = stream_markup(_, chat_id, videoid)
             run = await app.send_photo(
                 chat_id=original_chat_id,
@@ -548,10 +570,7 @@ class Call(PyTgCalls):
             try:
                 await self._play_on_assistant(client, chat_id, stream)
             except Exception:
-                return await app.send_message(
-                    original_chat_id,
-                    text=_["call_6"],
-                )
+                return await self._continue_after_failed_item(client, chat_id)
             if videoid == "telegram":
                 button = stream_markup(_, chat_id, videoid)
                 run = await app.send_photo(

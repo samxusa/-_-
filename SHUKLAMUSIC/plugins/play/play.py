@@ -53,10 +53,16 @@ async def play_commnd(
     playmode,
     url,
     fplay,
+    status_message=None,
 ):
-    mystic = await message.reply_text(
+    mystic = status_message or await message.reply_text(
         _["play_2"].format(channel) if channel else _["play_1"]
     )
+    if status_message and channel:
+        try:
+            await mystic.edit_text(_["play_2"].format(channel))
+        except Exception:
+            pass
     plist_id = None
     slider = None
     plist_type = None

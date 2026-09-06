@@ -77,12 +77,22 @@ async def skip(cli, message: Message, _, chat_id):
     else:
         check = db.get(chat_id)
         popped = None
+
+        async def restore_on_failure():
+            # Keep the current item and its local file available if Telegram
+            # rejects the replacement stream. The previous code deleted the
+            # item before switching, so one transient VC error lost the queue.
+            if popped and (not check or check[0] is not popped):
+                check.insert(0, popped)
+            return await message.reply_text(_["call_6"])
+
         try:
             popped = check.pop(0)
             if popped:
                 push_history(chat_id, popped)
-                await auto_clean(popped)
             if not check:
+                if popped:
+                    await auto_clean(popped)
                 await message.reply_text(
                     text=_["admin_6"].format(
                         message.from_user.mention, message.chat.title
@@ -128,7 +138,8 @@ async def skip(cli, message: Message, _, chat_id):
         try:
             await SHUKLA.skip_stream(chat_id, link, video=status, image=image)
         except:
-            return await message.reply_text(_["call_6"])
+            return await restore_on_failure()
+        await auto_clean(popped)
         button = stream_markup(_, chat_id)
         img = await get_thumb(videoid)
         run = await message.reply_photo(
@@ -153,7 +164,7 @@ async def skip(cli, message: Message, _, chat_id):
                 video=status,
             )
         except:
-            return await mystic.edit_text(_["call_6"])
+            return await restore_on_failure()
         try:
             image = await YouTube.thumbnail(videoid, True)
         except:
@@ -161,7 +172,8 @@ async def skip(cli, message: Message, _, chat_id):
         try:
             await SHUKLA.skip_stream(chat_id, file_path, video=status, image=image)
         except:
-            return await mystic.edit_text(_["call_6"])
+            return await restore_on_failure()
+        await auto_clean(popped)
         button = stream_markup(_, chat_id)
         img = await get_thumb(videoid)
         run = await message.reply_photo(
@@ -181,7 +193,8 @@ async def skip(cli, message: Message, _, chat_id):
         try:
             await SHUKLA.skip_stream(chat_id, videoid, video=status)
         except:
-            return await message.reply_text(_["call_6"])
+            return await restore_on_failure()
+        await auto_clean(popped)
         button = stream_markup(_, chat_id)
         run = await message.reply_photo(
             photo=config.STREAM_IMG_URL,
@@ -203,7 +216,8 @@ async def skip(cli, message: Message, _, chat_id):
         try:
             await SHUKLA.skip_stream(chat_id, queued, video=status, image=image)
         except:
-            return await message.reply_text(_["call_6"])
+            return await restore_on_failure()
+        await auto_clean(popped)
         if videoid == "telegram":
             button = stream_markup(_, chat_id)
             run = await message.reply_photo(

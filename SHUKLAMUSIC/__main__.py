@@ -101,7 +101,9 @@ async def init():
         LOGGER("SHUKLAMUSIC.core.commands").warning(
             f"Command menu registration failed; message handlers remain active: {type(exc).__name__}: {exc}"
         )
+    _runtime_state["stage"] = "assistants_starting"
     await userbot.start()
+    _runtime_state["stage"] = "voice_starting"
     await SHUKLA.start()
     try:
         await SHUKLA.stream_call("https://te.legra.ph/file/29f784eb49d230ab62e9e.mp4")

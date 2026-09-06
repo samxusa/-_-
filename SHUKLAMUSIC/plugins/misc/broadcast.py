@@ -279,6 +279,12 @@ async def broadcast_pin_callback(client, cq):
     global IS_BROADCASTING
     data = cq.data
 
+    if IS_BROADCASTING and data != "bcast_cancel":
+        return await cq.answer(
+            "A broadcast is already running. Please wait for it to finish.",
+            show_alert=True,
+        )
+
     if data == "bcast_cancel":
         try:
             await cq.message.delete()
@@ -316,12 +322,25 @@ async def broadcast_pin_callback(client, cq):
         pass
 
     IS_BROADCASTING = True
+    broadcast_error = None
     try:
         sent, failed, pinned = await _do_broadcast(
             client, origin_chat_id, msg_id, pin_mode, target=target
         )
+    except Exception as exc:
+        sent = failed = pinned = 0
+        broadcast_error = (
+            f"Broadcast stopped safely: {type(exc).__name__}."
+        )
     finally:
         IS_BROADCASTING = False
+
+    if broadcast_error:
+        try:
+            await cq.message.edit_text(f"⚠️ <b>{broadcast_error}</b>")
+        except Exception:
+            pass
+        return
 
     summary = (
         f"✅ <b>Broadcast Complete!</b>\n\n"

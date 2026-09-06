@@ -46,15 +46,15 @@ async def put_queue(
         "seconds": duration_in_seconds,
         "played": 0,
     }
+    queue = db.setdefault(chat_id, [])
     if forceplay:
-        check = db.get(chat_id)
+        check = queue
         if check:
             check.insert(0, put)
         else:
-            db[chat_id] = []
-            db[chat_id].append(put)
+            queue.append(put)
     else:
-        db[chat_id].append(put)
+        queue.append(put)
     autoclean.append(file)
 
 
@@ -91,12 +91,12 @@ async def put_queue_index(
         "seconds": dur,
         "played": 0,
     }
+    queue = db.setdefault(chat_id, [])
     if forceplay:
-        check = db.get(chat_id)
+        check = queue
         if check:
             check.insert(0, put)
         else:
-            db[chat_id] = []
-            db[chat_id].append(put)
+            queue.append(put)
     else:
-        db[chat_id].append(put)
+        queue.append(put)

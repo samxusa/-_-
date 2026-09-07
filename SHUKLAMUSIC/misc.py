@@ -11,6 +11,7 @@
 #
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
+import asyncio
 import socket
 import time
 import heroku3
@@ -56,19 +57,28 @@ async def sudo():
     global SUDOERS
     SUDOERS.add(config.OWNER_ID)
     sudoersdb = mongodb.sudoers
-    sudoers = await sudoersdb.find_one({"sudo": "sudo"})
-    sudoers = [] if not sudoers else sudoers["sudoers"]
-    if config.OWNER_ID not in sudoers:
-        sudoers.append(config.OWNER_ID)
-        await sudoersdb.update_one(
-            {"sudo": "sudo"},
-            {"$set": {"sudoers": sudoers}},
-            upsert=True,
+    try:
+        sudoers = await asyncio.wait_for(
+            sudoersdb.find_one({"sudo": "sudo"}), timeout=8
         )
-    if sudoers:
+        sudoers = [] if not sudoers else sudoers.get("sudoers", [])
+        if config.OWNER_ID not in sudoers:
+            sudoers.append(config.OWNER_ID)
+            await asyncio.wait_for(
+                sudoersdb.update_one(
+                    {"sudo": "sudo"},
+                    {"$set": {"sudoers": sudoers}},
+                    upsert=True,
+                ),
+                timeout=8,
+            )
         for user_id in sudoers:
             SUDOERS.add(user_id)
-    LOGGER(__name__).info(f"𝗦𝗨𝗗𝗢 𝗨𝗦𝗘𝗥 𝗗𝗢𝗡𝗘✨🎋.")
+        LOGGER(__name__).info(f"𝗦𝗨𝗗𝗢 𝗨𝗦𝗘𝗥 𝗗𝗢𝗡𝗘✨🎋.")
+    except Exception as exc:
+        LOGGER(__name__).warning(
+            f"Sudo database unavailable; continuing with OWNER_ID only: {type(exc).__name__}: {exc}"
+        )
 
 
 def heroku():

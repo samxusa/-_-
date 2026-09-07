@@ -69,16 +69,19 @@ async def init():
     ):
         LOGGER(__name__).error("String Session Not Filled, Please Fill A Pyrogram Session")
         exit()
-    await sudo()
     try:
-        users = await get_gbanned()
-        for user_id in users:
-            pass
-        users = await get_banned_users()
-        for user_id in users:
-            pass
-    except:
-        pass
+        await asyncio.wait_for(sudo(), timeout=10)
+    except Exception as exc:
+        LOGGER(__name__).warning(
+            f"Sudo initialization skipped; bot startup will continue: {type(exc).__name__}: {exc}"
+        )
+    for loader in (get_gbanned, get_banned_users):
+        try:
+            await asyncio.wait_for(loader(), timeout=10)
+        except Exception as exc:
+            LOGGER(__name__).warning(
+                f"Ban-list initialization skipped: {type(exc).__name__}: {exc}"
+            )
     _runtime_state["stage"] = "telegram_authorizing"
     await app.start()
     _runtime_state.update({"stage": "telegram_connected", "bot": getattr(app, "username", "unknown")})

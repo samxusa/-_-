@@ -393,16 +393,36 @@ class Call(PyTgCalls):
                         _ap = get_string(language_ap)
                         played_ids = await get_autoplay_history(chat_id)
                         # Prefer Radio-playlist related songs; fall back to title search
-                        details, new_vidid = await YouTube.related_track(last_vidid, played_ids=played_ids)
+                        details, new_vidid = None, None
+                        if last_vidid:
+                            try:
+                                details, new_vidid = await asyncio.wait_for(
+                                    YouTube.related_track(last_vidid, played_ids=played_ids),
+                                    timeout=25,
+                                )
+                            except Exception as related_exc:
+                                LOGGER(__name__).warning(
+                                    f"[autoplay] related-track lookup failed: {type(related_exc).__name__}: {related_exc}"
+                                )
                         if not details and last_title:
-                            details, new_vidid = await YouTube.track(last_title)
+                            try:
+                                details, new_vidid = await asyncio.wait_for(
+                                    YouTube.track(last_title), timeout=25
+                                )
+                            except Exception as search_exc:
+                                LOGGER(__name__).warning(
+                                    f"[autoplay] title fallback failed: {type(search_exc).__name__}: {search_exc}"
+                                )
                         if details and new_vidid and new_vidid != last_vidid and new_vidid not in played_ids:
                             from SHUKLAMUSIC.utils.stream.queue import put_queue
                             # Inherit video/audio mode from the song that just ended
                             autoplay_video = popped.get("streamtype", "audio") == "video"
                             # Download BEFORE clearing queue to avoid losing state on failure
-                            file_path, direct = await YouTube.download(
-                                new_vidid, None, videoid=True, video=autoplay_video
+                            file_path, direct = await asyncio.wait_for(
+                                YouTube.download(
+                                    new_vidid, None, videoid=True, video=autoplay_video
+                                ),
+                                timeout=120,
                             )
                             if not file_path:
                                 raise ValueError("Autoplay download returned None")

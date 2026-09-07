@@ -11,6 +11,7 @@
 #
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
+import asyncio
 import random
 from typing import Dict, List, Union
 from SHUKLAMUSIC import userbot
@@ -88,11 +89,17 @@ async def set_assistant(chat_id):
 
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
-    await assdb.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"assistant": ran_assistant}},
-        upsert=True,
-    )
+    try:
+        await asyncio.wait_for(
+            assdb.update_one(
+                {"chat_id": chat_id},
+                {"$set": {"assistant": ran_assistant}},
+                upsert=True,
+            ),
+            timeout=5,
+        )
+    except Exception:
+        pass
     userbot = await get_client(ran_assistant)
     return userbot
 
@@ -102,7 +109,12 @@ async def get_assistant(chat_id: int) -> str:
 
     assistant = assistantdict.get(chat_id)
     if not assistant:
-        dbassistant = await assdb.find_one({"chat_id": chat_id})
+        try:
+            dbassistant = await asyncio.wait_for(
+                assdb.find_one({"chat_id": chat_id}), timeout=5
+            )
+        except Exception:
+            dbassistant = None
         if not dbassistant:
             userbot = await set_assistant(chat_id)
             return userbot
@@ -131,11 +143,17 @@ async def set_calls_assistant(chat_id):
         raise RuntimeError("No assistant session is currently available")
     ran_assistant = random.choice(assistants)
     assistantdict[chat_id] = ran_assistant
-    await assdb.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"assistant": ran_assistant}},
-        upsert=True,
-    )
+    try:
+        await asyncio.wait_for(
+            assdb.update_one(
+                {"chat_id": chat_id},
+                {"$set": {"assistant": ran_assistant}},
+                upsert=True,
+            ),
+            timeout=5,
+        )
+    except Exception:
+        pass
     return ran_assistant
 
 
@@ -144,7 +162,12 @@ async def group_assistant(self, chat_id: int) -> int:
 
     assistant = assistantdict.get(chat_id)
     if not assistant:
-        dbassistant = await assdb.find_one({"chat_id": chat_id})
+        try:
+            dbassistant = await asyncio.wait_for(
+                assdb.find_one({"chat_id": chat_id}), timeout=5
+            )
+        except Exception:
+            dbassistant = None
         if not dbassistant:
             assis = await set_calls_assistant(chat_id)
         else:
@@ -249,7 +272,12 @@ async def get_autoplay(chat_id: int) -> bool:
     if cached is not None:
         return bool(cached)
     # Load from MongoDB on first access
-    doc = await autoplaydb.find_one({"chat_id": chat_id})
+    try:
+        doc = await asyncio.wait_for(
+            autoplaydb.find_one({"chat_id": chat_id}), timeout=5
+        )
+    except Exception:
+        doc = None
     state = bool(doc.get("autoplay", False)) if doc else False
     autoplay[chat_id] = state
     return state
@@ -310,14 +338,19 @@ booster = [
 
 async def get_playtype(chat_id: int) -> str:
     mode = playtype.get(chat_id)
+    if mode:
+        return mode
+    try:
+        mode = await asyncio.wait_for(
+            playtypedb.find_one({"chat_id": chat_id}), timeout=5
+        )
+    except Exception:
+        mode = None
     if not mode:
-        mode = await playtypedb.find_one({"chat_id": chat_id})
-        if not mode:
-            playtype[chat_id] = "Everyone"
-            return "Everyone"
-        playtype[chat_id] = mode["mode"]
-        return mode["mode"]
-    return mode
+        playtype[chat_id] = "Everyone"
+        return "Everyone"
+    playtype[chat_id] = mode.get("mode", "Everyone")
+    return playtype[chat_id]
 
 
 async def set_playtype(chat_id: int, mode: str):
@@ -329,14 +362,19 @@ async def set_playtype(chat_id: int, mode: str):
 
 async def get_playmode(chat_id: int) -> str:
     mode = playmode.get(chat_id)
+    if mode:
+        return mode
+    try:
+        mode = await asyncio.wait_for(
+            playmodedb.find_one({"chat_id": chat_id}), timeout=5
+        )
+    except Exception:
+        mode = None
     if not mode:
-        mode = await playmodedb.find_one({"chat_id": chat_id})
-        if not mode:
-            playmode[chat_id] = "Direct"
-            return "Direct"
-        playmode[chat_id] = mode["mode"]
-        return mode["mode"]
-    return mode
+        playmode[chat_id] = "Direct"
+        return "Direct"
+    playmode[chat_id] = mode.get("mode", "Direct")
+    return playmode[chat_id]
 
 
 async def set_playmode(chat_id: int, mode: str):
@@ -348,14 +386,19 @@ async def set_playmode(chat_id: int, mode: str):
 
 async def get_lang(chat_id: int) -> str:
     mode = langm.get(chat_id)
-    if not mode:
-        lang = await langdb.find_one({"chat_id": chat_id})
-        if not lang:
-            langm[chat_id] = "en"
-            return "en"
-        langm[chat_id] = lang["lang"]
-        return lang["lang"]
-    return mode
+    if mode:
+        return mode
+    try:
+        lang = await asyncio.wait_for(
+            langdb.find_one({"chat_id": chat_id}), timeout=5
+        )
+    except Exception:
+        lang = None
+    if not lang:
+        langm[chat_id] = "en"
+        return "en"
+    langm[chat_id] = lang.get("lang", "en")
+    return langm[chat_id]
 
 
 async def set_lang(chat_id: int, lang: str):
@@ -477,21 +520,24 @@ async def add_off(on_off: int):
 
 
 async def is_maintenance():
-    if not maintenance:
-        get = await onoffdb.find_one({"on_off": 1})
-        if not get:
-            maintenance.clear()
-            maintenance.append(2)
-            return True
-        else:
-            maintenance.clear()
-            maintenance.append(1)
-            return False
-    else:
-        if 1 in maintenance:
-            return False
-        else:
-            return True
+    if maintenance:
+        return 1 not in maintenance
+    try:
+        get = await asyncio.wait_for(
+            onoffdb.find_one({"on_off": 1}), timeout=5
+        )
+    except Exception:
+        # Fail open: a temporary Mongo outage must not silence every command.
+        maintenance.clear()
+        maintenance.append(2)
+        return True
+    if not get:
+        maintenance.clear()
+        maintenance.append(2)
+        return True
+    maintenance.clear()
+    maintenance.append(1)
+    return False
 
 
 async def maintenance_off():

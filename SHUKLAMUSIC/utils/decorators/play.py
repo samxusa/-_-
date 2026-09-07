@@ -154,7 +154,12 @@ def PlayWrapper(command):
             fplay = None
 
         if not active_chat:
-            userbot = await get_assistant(chat_id)
+            try:
+                userbot = await get_assistant(chat_id)
+            except Exception as exc:
+                return await _status_reply(
+                    _["call_3"].format(app.mention, type(exc).__name__)
+                )
             try:
                 try:
                     # Ask the assistant client about its own membership. The

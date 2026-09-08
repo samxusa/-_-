@@ -116,10 +116,15 @@ class Call(PyTgCalls):
         stream: types.MediaStream,
     ):
         try:
-            await client.play(
-                chat_id=chat_id,
-                stream=stream,
-                config=types.GroupCallConfig(auto_start=True),
+            # Never let a stalled voice-call request block /play, /skip or
+            # the stream-ended transition forever.
+            await asyncio.wait_for(
+                client.play(
+                    chat_id=chat_id,
+                    stream=stream,
+                    config=types.GroupCallConfig(auto_start=True),
+                ),
+                timeout=float(os.environ.get("PLAY_REQUEST_TIMEOUT", "25")),
             )
         except exceptions.NoActiveGroupCall:
             raise
@@ -281,7 +286,7 @@ class Call(PyTgCalls):
                 except Exception as exc:
                     last_exc = exc
                 if attempt < 3:
-                    await asyncio.sleep(attempt)
+                    await asyncio.sleep(min(0.75 * attempt, 2.0))
                     stream = self._build_stream(link, video=bool(video))
             if last_exc:
                 raise last_exc
@@ -338,7 +343,7 @@ class Call(PyTgCalls):
                     f"for chat {chat_id}: {e}"
                 )
                 if attempt < 3:
-                    await asyncio.sleep(attempt * 2)   # 2s, 4s backoff
+                    await asyncio.sleep(min(0.75 * attempt, 2.0))   # short bounded backoff
                     # rebuild stream for next attempt
                     stream = self._build_stream(link, video=bool(video))
             except Exception as e:

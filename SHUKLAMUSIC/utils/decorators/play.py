@@ -79,9 +79,13 @@ def PlayWrapper(command):
                     disable_web_page_preview=True,
                 )
 
+        # Acknowledge immediately. URL/search/download work can take seconds;
+        # users should never mistake that work for a dead bot.
+        status = await message.reply_text(_["play_1"])
+
         try:
             await message.delete()
-        except:
+        except Exception:
             pass
 
         audio_telegram = (
@@ -98,6 +102,10 @@ def PlayWrapper(command):
         url = await YouTube.url(message)
         if audio_telegram is None and video_telegram is None and url is None:
             if len(message.command) < 2:
+                try:
+                    await status.delete()
+                except Exception:
+                    pass
                 if "stream" in message.command:
                     return await message.reply_text(_["str_1"])
                 buttons = botplaylist_markup(_)
@@ -106,7 +114,6 @@ def PlayWrapper(command):
                     caption=_["play_18"],
                     reply_markup=InlineKeyboardMarkup(buttons),
                 )
-        status = await message.reply_text(_["play_1"])
 
         async def _status_reply(text, **kwargs):
             try:

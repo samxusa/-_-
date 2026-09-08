@@ -12,6 +12,7 @@
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
 import asyncio
+import inspect
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -72,6 +73,10 @@ class Call(PyTgCalls):
         self.four = PyTgCalls(self.userbot4, cache_duration=100)
         self.userbot5 = userbot.five
         self.five = PyTgCalls(self.userbot5, cache_duration=100)
+        self.userbot6 = userbot.six
+        self.six = PyTgCalls(self.userbot6, cache_duration=100)
+        self.userbot7 = userbot.seven
+        self.seven = PyTgCalls(self.userbot7, cache_duration=100)
         # A stream-ended callback and a manual /skip can arrive together.
         # Serialize transitions per chat so they cannot pop/clear the queue
         # twice and make the assistant leave an otherwise healthy VC.
@@ -154,6 +159,8 @@ class Call(PyTgCalls):
             (config.STRING3, self.three),
             (config.STRING4, self.four),
             (config.STRING5, self.five),
+            (config.STRING6, self.six),
+            (config.STRING7, self.seven),
         ]:
             if not string:
                 continue
@@ -381,7 +388,8 @@ class Call(PyTgCalls):
             else:
                 loop = loop - 1
                 await set_loop(chat_id, loop)
-            await auto_clean(popped)
+            if popped:
+                await auto_clean(popped)
             if not check:
                 # ── Autoplay: queue a related track instead of leaving ──
                 if await get_autoplay(chat_id) and popped:
@@ -637,17 +645,27 @@ class Call(PyTgCalls):
                 db[chat_id][0]["markup"] = "stream"
 
     async def ping(self):
+        clients = [
+            (config.STRING1, self.one),
+            (config.STRING2, self.two),
+            (config.STRING3, self.three),
+            (config.STRING4, self.four),
+            (config.STRING5, self.five),
+            (config.STRING6, self.six),
+            (config.STRING7, self.seven),
+        ]
         pings = []
-        if config.STRING1:
-            pings.append(self.one.ping)
-        if config.STRING2:
-            pings.append(self.two.ping)
-        if config.STRING3:
-            pings.append(self.three.ping)
-        if config.STRING4:
-            pings.append(self.four.ping)
-        if config.STRING5:
-            pings.append(self.five.ping)
+        for configured, client in clients:
+            if not configured:
+                continue
+            try:
+                value = getattr(client, "ping", 0)
+                value = value() if callable(value) else value
+                if inspect.isawaitable(value):
+                    value = await value
+                pings.append(float(value))
+            except Exception:
+                continue
         return str(round(sum(pings) / len(pings), 3)) if pings else "0"
 
     async def start(self):
@@ -658,6 +676,8 @@ class Call(PyTgCalls):
             ("Three", config.STRING3, self.three),
             ("Four", config.STRING4, self.four),
             ("Five", config.STRING5, self.five),
+            ("Six", config.STRING6, self.six),
+            ("Seven", config.STRING7, self.seven),
         ):
             if not configured:
                 continue
@@ -681,6 +701,8 @@ class Call(PyTgCalls):
             (config.STRING3, self.three),
             (config.STRING4, self.four),
             (config.STRING5, self.five),
+            (config.STRING6, self.six),
+            (config.STRING7, self.seven),
         ]:
             if not string:
                 continue

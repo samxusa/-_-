@@ -42,6 +42,7 @@ async def start_keepalive():
     _app = web.Application()
     _app.router.add_get("/", _ping)
     _app.router.add_get("/ping", _ping)
+    _app.router.add_get("/health", _ping)
     runner = web.AppRunner(_app)
     await runner.setup()
     port = int(os.environ.get("PORT", 8080))
@@ -186,4 +187,9 @@ async def run_forever():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_forever())
+    # Pyrogram clients are created during module import and bind to the
+    # process' configured event loop. Reuse that loop instead of asyncio.run(),
+    # which creates a second loop and causes "Future attached to a different
+    # loop" failures during Telegram reconnects.
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_forever())

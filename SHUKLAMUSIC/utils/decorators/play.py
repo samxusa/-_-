@@ -182,15 +182,16 @@ def PlayWrapper(command):
                 myu = await message.reply_text(_["call_4"].format(app.mention))
                 joined = False
 
-                # ── For channels: bot adds the assistant directly ──
-                if message.command[0][0] == "c":
-                    try:
-                        await app.add_chat_members(chat_id, userbot.id)
-                        joined = True
-                    except UserAlreadyParticipant:
-                        joined = True
-                    except Exception:
-                        pass   # fall through to invite-link method
+                # Prefer a direct add for every chat. This avoids relying on
+                # an old exported invite link and works when the bot has the
+                # required permission to invite members.
+                try:
+                    await app.add_chat_members(chat_id, userbot.id)
+                    joined = True
+                except UserAlreadyParticipant:
+                    joined = True
+                except Exception:
+                    pass   # fall through to invite-link method
 
                 # ── For groups (or channel fallback): join via invite link ──
                 if not joined:
@@ -236,10 +237,48 @@ def PlayWrapper(command):
                     except UserAlreadyParticipant:
                         joined = True
                     except Exception as e:
-                        await myu.delete()
-                        return await _status_reply(
-                            _["call_3"].format(app.mention, type(e).__name__)
-                        )
+                        # Invite links can expire while they remain cached in
+                        # memory. Drop the stale value, export a fresh link,
+                        # and retry once instead of making /play unusable.
+                        if type(e).__name__ not in {
+                            "InviteHashExpired",
+                            "InviteHashInvalid",
+                            "InviteHashEmpty",
+                        }:
+                            await myu.delete()
+                            return await _status_reply(
+                                _["call_3"].format(app.mention, type(e).__name__)
+                            )
+                        links.pop(chat_id, None)
+                        try:
+                            if message.chat.username and message.command[0][0] != "c":
+                                fresh_link = message.chat.username
+                            else:
+                                fresh_link = await app.export_chat_invite_link(chat_id)
+                            if fresh_link.startswith("https://t.me/+"):
+                                fresh_link = fresh_link.replace(
+                                    "https://t.me/+", "https://t.me/joinchat/"
+                                )
+                            await userbot.join_chat(fresh_link)
+                            invitelink = fresh_link
+                            joined = True
+                        except InviteRequestSent:
+                            try:
+                                await app.approve_chat_join_request(chat_id, userbot.id)
+                            except Exception as retry_exc:
+                                await myu.delete()
+                                return await _status_reply(
+                                    _["call_3"].format(app.mention, type(retry_exc).__name__)
+                                )
+                            await asyncio.sleep(1)
+                            joined = True
+                        except UserAlreadyParticipant:
+                            joined = True
+                        except Exception as retry_exc:
+                            await myu.delete()
+                            return await _status_reply(
+                                _["call_3"].format(app.mention, type(retry_exc).__name__)
+                            )
 
                     links[chat_id] = invitelink
 

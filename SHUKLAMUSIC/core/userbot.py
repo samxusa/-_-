@@ -56,10 +56,25 @@ class Userbot(Client):
             )
             return False
 
+        try:
+            # ``client.me`` can still be empty immediately after start() when
+            # Telegram has not delivered the first updates yet.
+            me = await asyncio.wait_for(client.get_me(), timeout=15)
+        except Exception as exc:
+            LOGGER(__name__).error(
+                f"Assistant {label} started but metadata lookup failed: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            try:
+                await client.stop()
+            except Exception:
+                pass
+            return False
+
         assistants.append(number)
-        client.id = client.me.id
-        client.name = client.me.mention
-        client.username = client.me.username
+        client.id = me.id
+        client.name = me.mention
+        client.username = me.username
         assistantids.append(client.id)
 
         # Do not join promotional chats or send startup messages automatically.

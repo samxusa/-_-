@@ -55,7 +55,11 @@ async def put_queue(
             queue.append(put)
     else:
         queue.append(put)
-    autoclean.append(file)
+    # A force-play or retry can enqueue the same source more than once.
+    # Keep one cleanup entry per source so an earlier song cannot delete a
+    # file still used by a later queue item.
+    if file not in autoclean:
+        autoclean.append(file)
 
 
 async def put_queue_index(

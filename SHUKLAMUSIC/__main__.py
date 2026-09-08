@@ -68,7 +68,12 @@ async def init():
         and not config.STRING7
     ):
         LOGGER(__name__).error("String Session Not Filled, Please Fill A Pyrogram Session")
-        exit()
+        _runtime_state.update({
+            "status": "error",
+            "stage": "session_check_failed",
+            "error": "No assistant session configured",
+        })
+        return
     try:
         await asyncio.wait_for(sudo(), timeout=10)
     except Exception as exc:

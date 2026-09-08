@@ -45,12 +45,20 @@ links = {}
 
 def PlayWrapper(command):
     async def wrapper(client, message):
+        # Acknowledge before any database or YouTube work. Both /play and
+        # /vplay use this wrapper, so slow language/maintenance lookups never
+        # make the bot appear unresponsive.
+        status = await message.reply_text("⏳ Processing your request...")
         language, maintenance = await asyncio.gather(
             get_lang(message.chat.id),
             is_maintenance(),
         )
         _ = get_string(language)
         if message.sender_chat:
+            try:
+                await status.delete()
+            except Exception:
+                pass
             from pyrogram.enums import ButtonStyle as _BS
             upl = InlineKeyboardMarkup(
                 [
@@ -74,14 +82,24 @@ def PlayWrapper(command):
 
         if maintenance is False:
             if message.from_user.id not in SUDOERS:
-                return await message.reply_text(
-                    text=f"{app.mention} ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ, ᴠɪsɪᴛ <a href={SUPPORT_CHAT}>sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ</a> ғᴏʀ ᴋɴᴏᴡɪɴɢ ᴛʜᴇ ʀᴇᴀsᴏɴ.",
-                    disable_web_page_preview=True,
+                text = (
+                    f"{app.mention} ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ, "
+                    f"ᴠɪsɪᴛ <a href={SUPPORT_CHAT}>sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ</a> "
+                    "ғᴏʀ ᴋɴᴏᴡɪɴɢ ᴛʜᴇ ʀᴇᴀsᴏɴ."
                 )
+                try:
+                    return await status.edit_text(
+                        text, disable_web_page_preview=True
+                    )
+                except Exception:
+                    return await message.reply_text(
+                        text, disable_web_page_preview=True
+                    )
 
-        # Acknowledge immediately. URL/search/download work can take seconds;
-        # users should never mistake that work for a dead bot.
-        status = await message.reply_text(_["play_1"])
+        try:
+            await status.edit_text(_["play_1"])
+        except Exception:
+            pass
 
         try:
             await message.delete()

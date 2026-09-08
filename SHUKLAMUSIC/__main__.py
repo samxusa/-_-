@@ -24,13 +24,21 @@ _runtime_state = {
     "bot": "ARES X GOD",
     "failed_plugins": [],
 }
+_keepalive_runner = None
 
 
 async def _ping(request):
     return web.json_response(_runtime_state)
 
 async def start_keepalive():
-    """Start a lightweight HTTP server so the repl stays alive via pings."""
+    """Start one lightweight HTTP server for health checks.
+
+    The supervisor can restart Telegram clients without starting duplicate
+    listeners on the same PORT.
+    """
+    global _keepalive_runner
+    if _keepalive_runner is not None:
+        return
     _app = web.Application()
     _app.router.add_get("/", _ping)
     _app.router.add_get("/ping", _ping)
@@ -49,6 +57,7 @@ async def start_keepalive():
             )
             return
         raise
+    _keepalive_runner = runner
     LOGGER("SHUKLAMUSIC").info(f"Keep-alive server started on port {port}")
 
 
@@ -113,14 +122,8 @@ async def init():
     await userbot.start()
     _runtime_state["stage"] = "voice_starting"
     await SHUKLA.start()
-    try:
-        await SHUKLA.stream_call("https://te.legra.ph/file/29f784eb49d230ab62e9e.mp4")
-    except NoActiveGroupCall:
-        LOGGER("SHUKLAMUSIC").error(
-            "No active voice chat in LOGGER_ID; continuing without startup audio."
-        )
-    except:
-        pass
+    # Do not join/play a boot-time test stream. It adds latency and can fail
+    # startup when LOGGER_ID is unavailable, even though the bot is healthy.
     await SHUKLA.decorators()
     await initialize_vc_logger()
     # Restore any dynamic sessions added via /addsession
@@ -137,5 +140,50 @@ async def init():
     LOGGER("SHUKLAMUSIC").info("Bot stopped.")
 
 
+async def _safe_stop():
+    """Stop partially-started clients after a failed run before retrying."""
+    for resource, name in ((SHUKLA, "voice"), (userbot, "assistant"), (app, "bot")):
+        stop = getattr(resource, "stop", None)
+        if not callable(stop):
+            continue
+        try:
+            await asyncio.wait_for(stop(), timeout=20)
+        except Exception as exc:
+            LOGGER("SHUKLAMUSIC").warning(
+                f"Could not stop {name} cleanly: {type(exc).__name__}: {exc}"
+            )
+
+
+async def run_forever():
+    """Keep the bot alive through transient Telegram/voice/network failures."""
+    restart_delay = 5
+    while True:
+        _runtime_state.update({
+            "status": "starting",
+            "stage": "supervisor_starting",
+            "failed_plugins": [],
+        })
+        try:
+            await init()
+            restart_delay = 5
+            # init() returns after a normal idle shutdown. Avoid a tight loop.
+            await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            await _safe_stop()
+            raise
+        except Exception as exc:
+            _runtime_state.update({
+                "status": "degraded",
+                "stage": "restart_wait",
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            LOGGER("SHUKLAMUSIC").exception(
+                f"Main loop crashed; retrying in {restart_delay}s: {exc}"
+            )
+            await _safe_stop()
+            await asyncio.sleep(restart_delay)
+            restart_delay = min(restart_delay * 2, 60)
+
+
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(init())
+    asyncio.run(run_forever())

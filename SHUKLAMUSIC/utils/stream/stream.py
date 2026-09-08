@@ -153,19 +153,14 @@ async def stream(
         duration_min = result["duration_min"]
         thumbnail = result["thumb"]
         status = True if video else None
-        try:
-            file_path, direct = await YouTube.download(
-                vidid, mystic, videoid=True, video=status
-            )
-        except:
-            raise AssistantErr(_["play_14"])
-        if not file_path:
-            raise AssistantErr(_["play_14"])
+        # Never download a YouTube item while another track is playing.
+        # Queue the video id immediately and download it only from
+        # Call._change_stream when it becomes the active item.
         if await is_active_chat(chat_id):
             await put_queue(
                 chat_id,
                 original_chat_id,
-                file_path if direct else f"vid_{vidid}",
+                f"vid_{vidid}",
                 title,
                 duration_min,
                 user_name,
@@ -180,45 +175,53 @@ async def stream(
                 text=_["queue_4"].format(position, title[:27], duration_min, user_name),
                 reply_markup=InlineKeyboardMarkup(button),
             )
-        else:
-            if not forceplay:
-                db[chat_id] = []
-            await SHUKLA.join_call(
-                chat_id,
-                original_chat_id,
-                file_path,
-                video=status,
-                image=thumbnail,
+            return
+        try:
+            file_path, direct = await YouTube.download(
+                vidid, mystic, videoid=True, video=status
             )
-            await put_queue(
-                chat_id,
-                original_chat_id,
-                file_path if direct else f"vid_{vidid}",
-                title,
+        except:
+            raise AssistantErr(_["play_14"])
+        if not file_path:
+            raise AssistantErr(_["play_14"])
+        if not forceplay:
+            db[chat_id] = []
+        await SHUKLA.join_call(
+            chat_id,
+            original_chat_id,
+            file_path,
+            video=status,
+            image=thumbnail,
+        )
+        await put_queue(
+            chat_id,
+            original_chat_id,
+            file_path if direct else f"vid_{vidid}",
+            title,
+            duration_min,
+            user_name,
+            vidid,
+            user_id,
+            "video" if video else "audio",
+            forceplay=forceplay,
+        )
+        img = await get_thumb(vidid)
+        button = stream_markup(_, chat_id)
+        run = await app.send_photo(
+            original_chat_id,
+            photo=img,
+            has_spoiler=True,
+            caption=_["stream_1"].format(
+                f"https://t.me/{app.username}?start=dl_{vidid}_{'v' if video else 'a'}",
+                title[:23],
                 duration_min,
                 user_name,
-                vidid,
-                user_id,
-                "video" if video else "audio",
-                forceplay=forceplay,
-            )
-            img = await get_thumb(vidid)
-            button = stream_markup(_, chat_id)
-            run = await app.send_photo(
-                original_chat_id,
-                photo=img,
-                has_spoiler=True,
-                caption=_["stream_1"].format(
-                    f"https://t.me/{app.username}?start=dl_{vidid}_{'v' if video else 'a'}",
-                    title[:23],
-                    duration_min,
-                    user_name,
-                ),
-                reply_markup=InlineKeyboardMarkup(button),
-            )
-            db[chat_id][0]["mystic"] = run
-            db[chat_id][0]["markup"] = "stream"
-            push_history(chat_id, dict(db[chat_id][0]))
+            ),
+            reply_markup=InlineKeyboardMarkup(button),
+        )
+        db[chat_id][0]["mystic"] = run
+        db[chat_id][0]["markup"] = "stream"
+        push_history(chat_id, dict(db[chat_id][0]))
     elif streamtype == "soundcloud":
         file_path = result["filepath"]
         title = result["title"]

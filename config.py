@@ -62,7 +62,7 @@ HEROKU_APP_NAME = getenv("HEROKU_APP_NAME")
 HEROKU_API_KEY = getenv("HEROKU_API_KEY")
 
 # Git
-UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/samxusa/Tg_music")
+UPSTREAM_REPO = getenv("UPSTREAM_REPO", "https://github.com/samxusa/-_-")
 MINIAPP_URL = getenv("MINIAPP_URL", "https://t.me/aresxcores")
 UPSTREAM_BRANCH = getenv("UPSTREAM_BRANCH", "main")
 GIT_TOKEN = (

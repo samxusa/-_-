@@ -1,4 +1,4 @@
-# NOBITA X PRIME Music Bot (SHUKLAMUSIC)
+# ROSE X MUSIC Bot (SHUKLAMUSIC)
 
 A Telegram voice-chat music bot that streams YouTube, Spotify, Apple Music, and SoundCloud audio into Telegram group voice chats. Includes an AI chatbot (Groq/LLaMA 3.3), autoplay, queue management, and a built-in keep-alive web server.
 
@@ -20,7 +20,7 @@ The bot starts automatically via the **"Start application"** workflow:
 python3 -m SHUKLAMUSIC
 ```
 
-The keep-alive HTTP server listens on port 8080 and responds to `/ping` with `{"status":"ok","bot":"NOBITA X PRIME"}`. Use this URL with an uptime monitor (UptimeRobot, etc.) to keep the bot alive.
+The keep-alive HTTP server listens on the platform-provided `PORT` (8080 locally by default) and responds to `/`, `/ping`, and `/health` with the current startup state. The bot is designed for an always-on VM deployment; an uptime monitor is not required to keep the process alive.
 
 ## Required Secrets
 
@@ -35,10 +35,13 @@ All secrets are stored as Replit Secrets (never hardcoded):
 | `STRING_SESSION` | Pyrogram userbot session string |
 | `LOGGER_ID` | Numeric ID of Telegram log group/channel |
 | `OWNER_ID` | Bot owner's Telegram numeric user ID |
-| `GIT_TOKEN` | GitHub personal access token (optional) |
+| `GIT_TOKEN` | GitHub personal access token (optional; never commit this) |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 key (optional) |
 | `GROQ_API_KEY` | Groq API key for AI chatbot (optional) |
 
-## User Preferences
+## Reliability
 
-- Keep existing project structure — do not restructure or migrate
+- The bot starts the health server before Telegram clients so deployment health checks can observe slow authentication.
+- Telegram and voice startup are supervised; transient failures back off and retry instead of exiting immediately.
+- Invalid or missing `LOGGER_ID` disables optional startup logging without blocking the music bot.
+- Keep all credentials in Replit Secrets or the deployment provider's secret store. Do not put them in `.replit`, `sample.env`, or committed source files.

@@ -72,47 +72,49 @@ class SHUKLA(Client):
         self.username = me.username or "None"
         self.mention = me.mention
 
-        try:
-            await self.send_message(
-                chat_id=config.LOGGER_ID,
-                text=(
-                    f"<u><b>» {self.mention} ʙᴏᴛ sᴛᴀʀᴛᴇᴅ :</b></u>\n\n"
-                    f"ɪᴅ : <code>{self.id}</code>\n"
-                    f"ɴᴀᴍᴇ : {self.name}\n"
-                    f"ᴜsᴇʀɴᴀᴍᴇ : @{self.username}"
-                ),
-            )
-
-        except (errors.ChannelInvalid, errors.PeerIdInvalid):
-            LOGGER(__name__).warning(
-                "Bot cannot access LOGGER_ID; startup notifications are disabled. "
-                "Add the bot to the log group/channel to enable them."
-            )
-
-        except Exception as ex:
-            LOGGER(__name__).warning(
-                f"Could not send startup notification to LOGGER_ID: "
-                f"{type(ex).__name__}: {ex}"
-            )
-
-        try:
-            member = await self.get_chat_member(
-                config.LOGGER_ID,
-                self.id
-            )
-
-            if member.status not in (
-                ChatMemberStatus.ADMINISTRATOR,
-                ChatMemberStatus.OWNER,
-            ):
-                LOGGER(__name__).warning(
-                    "Bot is not an admin in LOGGER_ID; logger checks are skipped."
+        if config.LOGGER_ID:
+            try:
+                await self.send_message(
+                    chat_id=config.LOGGER_ID,
+                    text=(
+                        f"<u><b>» {self.mention} ʙᴏᴛ sᴛᴀʀᴛᴇᴅ :</b></u>\n\n"
+                        f"ɪᴅ : <code>{self.id}</code>\n"
+                        f"ɴᴀᴍᴇ : {self.name}\n"
+                        f"ᴜsᴇʀɴᴀᴍᴇ : @{self.username}"
+                    ),
                 )
 
-        except Exception as ex:
-            LOGGER(__name__).warning(
-                f"Could not verify LOGGER_ID admin status: "
-                f"{type(ex).__name__}: {ex}"
+            except (errors.ChannelInvalid, errors.PeerIdInvalid):
+                LOGGER(__name__).warning(
+                    "Bot cannot access LOGGER_ID; startup notifications are disabled. "
+                    "Add the bot to the log group/channel to enable them."
+                )
+
+            except Exception as ex:
+                LOGGER(__name__).warning(
+                    f"Could not send startup notification to LOGGER_ID: "
+                    f"{type(ex).__name__}: {ex}"
+                )
+
+            try:
+                member = await self.get_chat_member(config.LOGGER_ID, self.id)
+
+                if member.status not in (
+                    ChatMemberStatus.ADMINISTRATOR,
+                    ChatMemberStatus.OWNER,
+                ):
+                    LOGGER(__name__).warning(
+                        "Bot is not an admin in LOGGER_ID; logger checks are skipped."
+                    )
+
+            except Exception as ex:
+                LOGGER(__name__).warning(
+                    f"Could not verify LOGGER_ID admin status: "
+                    f"{type(ex).__name__}: {ex}"
+                )
+        else:
+            LOGGER(__name__).info(
+                "LOGGER_ID is not configured; startup notifications are disabled."
             )
 
         LOGGER(__name__).info(

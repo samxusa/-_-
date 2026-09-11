@@ -381,16 +381,36 @@ class Call(PyTgCalls):
         async with self._transition_locks[chat_id]:
             return await self._change_stream(client, chat_id)
 
-    async def _change_stream(self, client: PyTgCalls, chat_id: int):
+    async def play_next(self, chat_id: int):
+        """Start the current queue head after a numbered skip.
+
+        The normal stream-ended callback pops the finished item first. A
+        numbered /skip already removes the requested items, so it must start
+        the remaining head without popping it a second time.
+        """
+        assistant = await group_assistant(self, chat_id)
+        async with self._transition_locks[chat_id]:
+            return await self._change_stream(
+                assistant,
+                chat_id,
+                pop_current=False,
+            )
+
+    async def _change_stream(
+        self,
+        client: PyTgCalls,
+        chat_id: int,
+        pop_current: bool = True,
+    ):
         check = db.get(chat_id) or []
         if not check:
             return
         popped = None
         loop = await get_loop(chat_id)
         try:
-            if loop == 0:
+            if loop == 0 and pop_current:
                 popped = check.pop(0)
-            else:
+            elif pop_current:
                 loop = loop - 1
                 await set_loop(chat_id, loop)
             if popped:

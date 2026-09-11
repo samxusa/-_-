@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 from typing import Union
 import yt_dlp
 import aiohttp as _aiohttp_module
@@ -151,6 +152,8 @@ import aiohttp
 API_URL = os.environ.get("API_URL", "https://api01.shrutibots.site")
 API_KEY = os.environ.get("API_KEY", "")
 LOADER_API_URL = "https://loader.to/ajax/download.php"
+_search_cache = {}
+_SEARCH_CACHE_TTL = 45
 
 DOWNLOAD_DIR = "downloads"
 
@@ -788,6 +791,83 @@ class YouTubeAPI:
             return track_details, vidid
 
         raise ValueError(f"No search results found for: {link}")
+
+    async def search(self, query: str, max_results: int = 5):
+        """Return search results without blocking Pyrogram's event loop.
+
+        The old /search plugin called youtube-search-python directly from the
+        handler. That synchronous network call could stall every command while
+        YouTube was slow. Prefer the Data API when configured, then run the
+        legacy search and yt-dlp fallbacks in a worker thread.
+        """
+        query = (query or "").strip()
+        if not query:
+            return []
+        cache_key = (query.casefold(), max_results)
+        cached = _search_cache.get(cache_key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+
+        results = await _yt_api_search(query, max_results=max_results)
+        if not results:
+            try:
+                legacy = VideosSearch(query, limit=max_results)
+                raw = (await asyncio.wait_for(legacy.next(), timeout=12)).get("result") or []
+                results = [
+                    {
+                        "title": item.get("title", "Unknown"),
+                        "link": item.get("link") or f"https://www.youtube.com/watch?v={item.get('id', '')}",
+                        "vidid": item.get("id", ""),
+                        "duration_min": item.get("duration") or "0:00",
+                        "thumb": (item.get("thumbnails") or [{}])[0].get(
+                            "url", f"https://i.ytimg.com/vi/{item.get('id', '')}/hqdefault.jpg"
+                        ).split("?")[0],
+                    }
+                    for item in raw
+                    if item.get("id")
+                ]
+            except Exception:
+                results = []
+
+        if not results:
+            def _ytdlp_search():
+                opts = _base_ydl_opts(skip_download=True, noplaylist=True)
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(
+                        f"ytsearch{max_results}:{query}", download=False
+                    )
+                    output = []
+                    for entry in (info or {}).get("entries") or []:
+                        vid = entry.get("id")
+                        if not vid:
+                            continue
+                        seconds = int(entry.get("duration") or 0)
+                        minutes, remainder = divmod(seconds, 60)
+                        output.append(
+                            {
+                                "title": entry.get("title", "Unknown"),
+                                "link": f"https://www.youtube.com/watch?v={vid}",
+                                "vidid": vid,
+                                "duration_min": f"{minutes}:{remainder:02d}",
+                                "thumb": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+                            }
+                        )
+                    return output
+
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.get_running_loop().run_in_executor(None, _ytdlp_search),
+                    timeout=25,
+                )
+            except Exception:
+                results = []
+
+        _search_cache[cache_key] = (time.monotonic() + _SEARCH_CACHE_TTL, results)
+        if len(_search_cache) > 100:
+            expired = [key for key, value in _search_cache.items() if value[0] <= time.monotonic()]
+            for key in expired[:50]:
+                _search_cache.pop(key, None)
+        return results
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         if videoid:

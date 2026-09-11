@@ -12,6 +12,8 @@
 # ❤️ Made with dedication and love by ItzShukla
 # -----------------------------------------------
 import os
+import asyncio
+from collections import defaultdict
 from random import randint
 from typing import Union
 from pyrogram.types import InlineKeyboardMarkup
@@ -28,7 +30,46 @@ from SHUKLAMUSIC.utils.stream.history import push_history
 from SHUKLAMUSIC.utils.thumbnails import get_thumb
 
 
+_stream_locks = defaultdict(asyncio.Lock)
+
+
 async def stream(
+    _,
+    mystic,
+    user_id,
+    result,
+    chat_id,
+    user_name,
+    original_chat_id,
+    video: Union[bool, str] = None,
+    streamtype: Union[bool, str] = None,
+    spotify: Union[bool, str] = None,
+    forceplay: Union[bool, str] = None,
+):
+    """Serialize queue/voice-chat mutations per chat.
+
+    Search and download work happens before this function in the play handler,
+    but the final queue mutation and VC join must still be atomic. Without a
+    per-chat lock, two fast /play requests can both see an idle chat and race
+    into two voice calls.
+    """
+    async with _stream_locks[chat_id]:
+        return await _stream(
+            _,
+            mystic,
+            user_id,
+            result,
+            chat_id,
+            user_name,
+            original_chat_id,
+            video=video,
+            streamtype=streamtype,
+            spotify=spotify,
+            forceplay=forceplay,
+        )
+
+
+async def _stream(
     _,
     mystic,
     user_id,

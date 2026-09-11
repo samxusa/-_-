@@ -39,35 +39,32 @@ async def skip(cli, message: Message, _, chat_id):
         state = message.text.split(None, 1)[1].strip()
         if state.isnumeric():
             state = int(state)
+            if state < 1:
+                return await message.reply_text(_["admin_9"])
             check = db.get(chat_id)
             if check:
                 count = len(check)
-                if count > 2:
-                    count = int(count - 1)
-                    if 1 <= state <= count:
-                        for x in range(state):
-                            popped = None
-                            try:
-                                popped = check.pop(0)
-                            except:
-                                return await message.reply_text(_["admin_12"])
-                            if popped:
-                                await auto_clean(popped)
-                            if not check:
-                                try:
-                                    await message.reply_text(
-                                        text=_["admin_6"].format(
-                                            message.from_user.mention,
-                                            message.chat.title,
-                                        ),
-                                        reply_markup=close_markup(_),
-                                    )
-                                    await SHUKLA.stop_stream(chat_id)
-                                except:
-                                    return
-                                break
-                    else:
-                        return await message.reply_text(_["admin_11"].format(count))
+                if count > 1:
+                    # /skip N means skip the currently playing item plus
+                    # N-1 queued items, then immediately start the next one.
+                    if state >= count:
+                        return await message.reply_text(_["admin_11"].format(count - 1))
+                    for skip_index in range(state):
+                        popped = check.pop(0)
+                        await auto_clean(popped)
+                    if not check:
+                        return await SHUKLA.stop_stream(chat_id)
+                    try:
+                        push_history(chat_id, popped)
+                        await SHUKLA.play_next(chat_id)
+                        return
+                    except Exception:
+                        # Put the next item back at the head if the VC
+                        # transition failed, so a retry does not lose it.
+                        if check:
+                            failed = check.pop(0)
+                            check.insert(0, failed)
+                        return await message.reply_text(_["call_6"])
                 else:
                     return await message.reply_text(_["admin_10"])
             else:

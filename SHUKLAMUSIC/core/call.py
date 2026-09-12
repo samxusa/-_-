@@ -451,11 +451,12 @@ class Call(PyTgCalls):
                             # Inherit video/audio mode from the song that just ended
                             autoplay_video = popped.get("streamtype", "audio") == "video"
                             # Download BEFORE clearing queue to avoid losing state on failure
+                            download_timeout = 75 if autoplay_video else 60
                             file_path, direct = await asyncio.wait_for(
                                 YouTube.download(
                                     new_vidid, None, videoid=True, video=autoplay_video
                                 ),
-                                timeout=120,
+                                timeout=download_timeout,
                             )
                             if not file_path:
                                 raise ValueError("Autoplay download returned None")

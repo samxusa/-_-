@@ -185,7 +185,13 @@ async def play_commnd(
                 cap = _["play_10"]
             elif "https://youtu.be" in url:
                 videoid = url.split("/")[-1].split("?")[0]
-                details, track_id = await YouTube.track(f"https://www.youtube.com/watch?v={videoid}")
+                try:
+                    details, track_id = await YouTube.track(
+                        f"https://www.youtube.com/watch?v={videoid}"
+                    )
+                except Exception as e:
+                    print(e)
+                    return await mystic.edit_text(_["play_3"])
                 streamtype = "youtube"
                 img = details["thumb"]
                 cap = _["play_11"].format(

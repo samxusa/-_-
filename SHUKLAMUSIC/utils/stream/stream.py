@@ -91,7 +91,7 @@ async def _stream(
         count = 0
         for search in result:
             if int(count) == config.PLAYLIST_FETCH_LIMIT:
-                continue
+                break
             try:
                 (
                     title,

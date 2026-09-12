@@ -463,8 +463,6 @@ class Call(PyTgCalls):
                             await add_autoplay_history(chat_id, last_vidid)
                             await add_autoplay_history(chat_id, new_vidid)
                             db[chat_id] = []
-                            ap_stream = self._build_stream(file_path, video=autoplay_video)
-                            await self._play_on_assistant(client, chat_id, ap_stream)
                             await put_queue(
                                 chat_id,
                                 original_chat_id,
@@ -476,30 +474,47 @@ class Call(PyTgCalls):
                                 0,
                                 "video" if autoplay_video else "audio",
                             )
-                            img = await gen_thumb(new_vidid)
-                            ap_button = stream_markup_timer(_ap, chat_id, "0:00", details["duration_min"], videoid=new_vidid, autoplay=True)
-                            ap_title = details["title"].title()
-                            run = await app.send_photo(
-                                original_chat_id,
-                                photo=img,
-                                has_spoiler=True,
-                                caption=_ap["stream_1"].format(
-                                    f"https://t.me/{app.username}?start=info_{new_vidid}",
-                                    ap_title[:23],
+                            ap_stream = self._build_stream(file_path, video=autoplay_video)
+                            await self._play_on_assistant(client, chat_id, ap_stream)
+                            # Playback is now committed. Notification failures
+                            # must never tear down an otherwise healthy VC.
+                            try:
+                                img = await gen_thumb(new_vidid)
+                                ap_button = stream_markup_timer(
+                                    _ap,
+                                    chat_id,
+                                    "0:00",
                                     details["duration_min"],
-                                    "❤️‍🔥 ᴀᴜᴛᴏᴘʟᴀʏ",
-                                ),
-                                reply_markup=InlineKeyboardMarkup(ap_button),
-                            )
-                            # Guard against race: put_queue must have populated db
-                            if db.get(chat_id) and len(db[chat_id]) > 0:
-                                db[chat_id][0]["mystic"] = run
-                                db[chat_id][0]["markup"] = "stream"
-                                # Push to history so ⏮ Back works after autoplay
-                                try:
+                                    videoid=new_vidid,
+                                    autoplay=True,
+                                )
+                                ap_title = details["title"].title()
+                                run = await app.send_photo(
+                                    original_chat_id,
+                                    photo=img,
+                                    has_spoiler=True,
+                                    caption=_ap["stream_1"].format(
+                                        f"https://t.me/{app.username}?start=info_{new_vidid}",
+                                        ap_title[:23],
+                                        details["duration_min"],
+                                        "❤️‍🔥 ᴀᴜᴛᴏᴘʟᴀʏ",
+                                    ),
+                                    reply_markup=InlineKeyboardMarkup(ap_button),
+                                )
+                                if db.get(chat_id):
+                                    db[chat_id][0]["mystic"] = run
+                                    db[chat_id][0]["markup"] = "stream"
+                            except Exception as notify_exc:
+                                LOGGER(__name__).warning(
+                                    f"[autoplay] notification failed after playback started: "
+                                    f"{type(notify_exc).__name__}: {notify_exc}"
+                                )
+                            # Push to history so ⏮ Back works after autoplay.
+                            try:
+                                if db.get(chat_id):
                                     push_history(chat_id, dict(db[chat_id][0]))
-                                except Exception:
-                                    pass
+                            except Exception:
+                                pass
                             return
                     except Exception as _ap_err:
                         LOGGER(__name__).warning(f"[autoplay] failed for chat {chat_id}: {_ap_err}")

@@ -11,6 +11,7 @@ import os
 import re
 import time
 from typing import Union
+from urllib.parse import parse_qs, urlparse
 import yt_dlp
 import aiohttp as _aiohttp_module
 import config
@@ -95,6 +96,36 @@ async def _yt_api_search(query: str, max_results: int = 10) -> list:
         return []
 
 
+async def _youtube_oembed(video_id: str) -> dict | None:
+    """Return usable metadata even when yt-dlp/search endpoints are blocked."""
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    try:
+        async with _aiohttp_module.ClientSession() as session:
+            async with session.get(
+                "https://www.youtube.com/oembed",
+                params={"url": url, "format": "json"},
+                timeout=_aiohttp_module.ClientTimeout(total=8),
+            ) as response:
+                if response.status != 200:
+                    return None
+                data = await response.json()
+        title = data.get("title")
+        if not title:
+            return None
+        return {
+            "title": title,
+            "link": url,
+            "vidid": video_id,
+            # Duration is unknown from oEmbed; playback still works and the
+            # stream layer will update progress once the file is ready.
+            "duration_min": "0:00",
+            "thumb": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+        }
+    except Exception as exc:
+        _LOGGER.warning(f"[YT oEmbed] failed for {video_id}: {exc}")
+        return None
+
+
 def _cookies_file():
     """Return an explicitly configured cookie file, if one exists.
 
@@ -163,6 +194,28 @@ _download_locks: dict[tuple[str, str], asyncio.Lock] = {}
 _track_locks: dict[str, asyncio.Lock] = {}
 _track_cache: dict[str, tuple[float, tuple[dict, str]]] = {}
 _TRACK_CACHE_TTL = 300
+
+
+def _video_id_from_url(value: str) -> str | None:
+    """Extract a YouTube video id without sending the URL through search."""
+    try:
+        parsed = urlparse((value or "").strip())
+        host = parsed.netloc.lower().split(":")[0]
+        if host == "youtu.be":
+            candidate = parsed.path.strip("/").split("/")[0]
+        elif host.endswith("youtube.com"):
+            candidate = parse_qs(parsed.query).get("v", [None])[0]
+            if not candidate:
+                parts = [part for part in parsed.path.split("/") if part]
+                if len(parts) >= 2 and parts[0] in {"shorts", "live", "embed"}:
+                    candidate = parts[1]
+        else:
+            return None
+        if candidate and re.fullmatch(r"[A-Za-z0-9_-]{6,20}", candidate):
+            return candidate
+    except Exception:
+        pass
+    return None
 
 
 def time_to_seconds(time):
@@ -796,6 +849,14 @@ class YouTubeAPI:
         if "&" in link:
             link = link.split("&")[0]
 
+        # A URL is already an exact track. Searching the URL again is slower
+        # and can return no result when youtube-search-python is blocked.
+        direct_id = _video_id_from_url(link)
+        if direct_id:
+            direct = await _youtube_oembed(direct_id)
+            if direct:
+                return direct, direct_id
+
         # ── 1. YouTube Data API v3 (fastest, most reliable) ───────────────────
         api_results = await _yt_api_search(link, max_results=1)
         if api_results:
@@ -840,12 +901,15 @@ class YouTubeAPI:
             return None, None
 
         loop = asyncio.get_event_loop()
-        track_details, vidid = await asyncio.wait_for(
-            loop.run_in_executor(None, _ytdlp_search),
-            timeout=30,
-        )
-        if track_details:
-            return track_details, vidid
+        try:
+            track_details, vidid = await asyncio.wait_for(
+                loop.run_in_executor(None, _ytdlp_search),
+                timeout=20,
+            )
+            if track_details:
+                return track_details, vidid
+        except Exception as exc:
+            _LOGGER.warning(f"[track] all search providers failed for '{link}': {exc}")
 
         raise ValueError(f"No search results found for: {link}")
 

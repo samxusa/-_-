@@ -157,6 +157,13 @@ _SEARCH_CACHE_TTL = 45
 
 DOWNLOAD_DIR = "downloads"
 
+# Prevent duplicate yt-dlp/API work when a command and a queue transition
+# request the same track at the same time.
+_download_locks: dict[tuple[str, str], asyncio.Lock] = {}
+_track_locks: dict[str, asyncio.Lock] = {}
+_track_cache: dict[str, tuple[float, tuple[dict, str]]] = {}
+_TRACK_CACHE_TTL = 300
+
 
 def time_to_seconds(time):
     stringt = str(time)
@@ -346,7 +353,47 @@ async def _download_via_loader(
     return False
 
 
-async def download_song(link: str) -> str:
+def _get_download_lock(kind: str, video_id: str) -> asyncio.Lock:
+    key = (kind, video_id)
+    lock = _download_locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _download_locks[key] = lock
+    return lock
+
+
+def _get_track_lock(key: str) -> asyncio.Lock:
+    lock = _track_locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _track_locks[key] = lock
+    return lock
+
+
+async def _run_ytdlp(args: list[str], timeout: float) -> tuple[int, bytes]:
+    """Run yt-dlp with a hard timeout and guaranteed child cleanup."""
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        _, stderr_data = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return proc.returncode, stderr_data or b""
+    except asyncio.TimeoutError:
+        # wait_for cancels communicate(), but does not stop the OS process.
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        try:
+            await asyncio.wait_for(proc.communicate(), timeout=5)
+        except Exception:
+            pass
+        raise
+
+
+async def _download_song(link: str) -> str:
     video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
     if not video_id or len(video_id) < 3:
         return None
@@ -370,7 +417,7 @@ async def download_song(link: str) -> str:
                     async with session.get(
                         f"{API_URL}/download",
                         params={"url": video_id, "type": "audio", "api_key": API_KEY},
-                        timeout=aiohttp.ClientTimeout(total=15),
+                        timeout=aiohttp.ClientTimeout(total=10),
                     ) as resp:
                         if resp.status == 200:
                             # Some download services return octet-stream for
@@ -418,15 +465,10 @@ async def download_song(link: str) -> str:
                 if _cookies:
                     _ytdlp_args += ["--cookies", _cookies]
                 _ytdlp_args += ["-o", tmp_ytdl, yt_url]
-                proc = await asyncio.create_subprocess_exec(
-                    *_ytdlp_args,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                _, stderr_data = await asyncio.wait_for(proc.communicate(), timeout=90)
-                if proc.returncode != 0 and stderr_data:
+                returncode, stderr_data = await _run_ytdlp(_ytdlp_args, timeout=60)
+                if returncode != 0 and stderr_data:
                     _LOGGER.warning(
-                        f"[download_song] yt-dlp exited {proc.returncode} for {video_id}: "
+                        f"[download_song] yt-dlp exited {returncode} for {video_id}: "
                         + stderr_data.decode(errors="replace")[-400:]
                     )
                 # yt-dlp may append .mp3 extension
@@ -459,7 +501,15 @@ async def download_song(link: str) -> str:
     return mp3_path
 
 
-async def download_video(link: str) -> str:
+async def download_song(link: str) -> str:
+    video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
+    if not video_id or len(video_id) < 3:
+        return None
+    async with _get_download_lock("audio", video_id):
+        return await _download_song(link)
+
+
+async def _download_video(link: str) -> str:
     video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
     if not video_id or len(video_id) < 3:
         return None
@@ -479,7 +529,7 @@ async def download_video(link: str) -> str:
                 async with session.get(
                     f"{API_URL}/download",
                     params={"url": video_id, "type": "video", "api_key": API_KEY},
-                    timeout=aiohttp.ClientTimeout(total=15),
+                        timeout=aiohttp.ClientTimeout(total=10),
                 ) as resp:
                     if resp.status == 200:
                         content_type = resp.content_type or ""
@@ -525,15 +575,10 @@ async def download_video(link: str) -> str:
             if _cookies:
                 _ytdlp_args += ["--cookies", _cookies]
             _ytdlp_args += ["-o", tmp_ytdl, yt_url]
-            proc = await asyncio.create_subprocess_exec(
-                *_ytdlp_args,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            _, stderr_data = await asyncio.wait_for(proc.communicate(), timeout=120)
-            if proc.returncode != 0 and stderr_data:
+            returncode, stderr_data = await _run_ytdlp(_ytdlp_args, timeout=75)
+            if returncode != 0 and stderr_data:
                 _LOGGER.warning(
-                    f"[download_video] yt-dlp exited {proc.returncode} for {video_id}: "
+                    f"[download_video] yt-dlp exited {returncode} for {video_id}: "
                     + stderr_data.decode(errors="replace")[-400:]
                 )
             import glob as _glob
@@ -565,6 +610,14 @@ async def download_video(link: str) -> str:
         except Exception:
             pass
     return None
+
+
+async def download_video(link: str) -> str:
+    video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
+    if not video_id or len(video_id) < 3:
+        return None
+    async with _get_download_lock("video", video_id):
+        return await _download_video(link)
 
 
 class YouTubeAPI:
@@ -737,7 +790,7 @@ class YouTubeAPI:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _fetch)
 
-    async def track(self, link: str, videoid: Union[bool, str] = None):
+    async def _track_uncached(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
             link = self.base + link
         if "&" in link:
@@ -795,6 +848,30 @@ class YouTubeAPI:
             return track_details, vidid
 
         raise ValueError(f"No search results found for: {link}")
+
+    async def track(self, link: str, videoid: Union[bool, str] = None):
+        """Resolve one track once and share the result with concurrent callers."""
+        if videoid:
+            link = self.base + link
+        key = (link or "").split("&", 1)[0].strip().casefold()
+        if not key:
+            raise ValueError("Empty YouTube query")
+        cached = _track_cache.get(key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+
+        async with _get_track_lock(key):
+            cached = _track_cache.get(key)
+            if cached and cached[0] > time.monotonic():
+                return cached[1]
+            result = await self._track_uncached(link)
+            _track_cache[key] = (time.monotonic() + _TRACK_CACHE_TTL, result)
+            if len(_track_cache) > 200:
+                now = time.monotonic()
+                for old_key, (expires, _) in list(_track_cache.items()):
+                    if expires <= now:
+                        _track_cache.pop(old_key, None)
+            return result
 
     async def search(self, query: str, max_results: int = 5):
         """Return search results without blocking Pyrogram's event loop.

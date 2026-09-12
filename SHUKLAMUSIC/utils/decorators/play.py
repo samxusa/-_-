@@ -45,15 +45,15 @@ links = {}
 
 def PlayWrapper(command):
     async def wrapper(client, message):
-        # Acknowledge before any database or YouTube work. Both /play and
-        # /vplay use this wrapper, so slow language/maintenance lookups never
-        # make the bot appear unresponsive.
-        status = await message.reply_text("⏳ Processing your request...")
+        # Resolve lightweight settings first, then create one status message.
+        # This prevents /play and /vplay from leaving duplicate progress
+        # messages behind when the first edit races with the handler.
         language, maintenance = await asyncio.gather(
             get_lang(message.chat.id),
             is_maintenance(),
         )
         _ = get_string(language)
+        status = await message.reply_text(_["play_1"])
         if message.sender_chat:
             try:
                 await status.delete()
@@ -95,11 +95,6 @@ def PlayWrapper(command):
                     return await message.reply_text(
                         text, disable_web_page_preview=True
                     )
-
-        try:
-            await status.edit_text(_["play_1"])
-        except Exception:
-            pass
 
         try:
             await message.delete()

@@ -6,6 +6,7 @@
 # ---------------------------------------------------------------
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -124,6 +125,61 @@ async def _youtube_oembed(video_id: str) -> dict | None:
     except Exception as exc:
         _LOGGER.warning(f"[YT oEmbed] failed for {video_id}: {exc}")
         return None
+
+
+async def _youtube_web_search(query: str, max_results: int = 1) -> list:
+    """Search YouTube's public results page when third-party search breaks."""
+    try:
+        async with _aiohttp_module.ClientSession(
+            headers={"User-Agent": "Mozilla/5.0"}
+        ) as session:
+            async with session.get(
+                "https://www.youtube.com/results",
+                params={"search_query": query},
+                timeout=_aiohttp_module.ClientTimeout(total=8),
+            ) as response:
+                if response.status != 200:
+                    return []
+                html = await response.text()
+        match = re.search(r"ytInitialData\s*=\s*(\{.*?\});</script>", html, re.S)
+        if not match:
+            return []
+        data = json.loads(match.group(1))
+        results = []
+
+        def walk(value):
+            if len(results) >= max_results:
+                return
+            if isinstance(value, dict):
+                renderer = value.get("videoRenderer")
+                if renderer:
+                    video_id = renderer.get("videoId")
+                    runs = (renderer.get("title") or {}).get("runs") or []
+                    title = "".join(run.get("text", "") for run in runs).strip()
+                    if video_id and title:
+                        duration = (renderer.get("lengthText") or {}).get(
+                            "simpleText", "0:00"
+                        )
+                        results.append(
+                            {
+                                "title": title,
+                                "link": f"https://www.youtube.com/watch?v={video_id}",
+                                "vidid": video_id,
+                                "duration_min": duration,
+                                "thumb": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+                            }
+                        )
+                for child in value.values():
+                    walk(child)
+            elif isinstance(value, list):
+                for child in value:
+                    walk(child)
+
+        walk(data)
+        return results
+    except Exception as exc:
+        _LOGGER.warning(f"[YT web search] failed for '{query}': {exc}")
+        return []
 
 
 def _cookies_file():
@@ -881,6 +937,13 @@ class YouTubeAPI:
                 return track_details, r["id"]
         except Exception:
             pass
+
+        # YouTube's own results page is a reliable final metadata source when
+        # both py_yt and yt-dlp search are blocked or outdated.
+        web_results = await _youtube_web_search(link, max_results=1)
+        if web_results:
+            result = web_results[0]
+            return result, result["vidid"]
 
         # ── 3. Last resort: yt-dlp ytsearch ──────────────────────────────────
         def _ytdlp_search():

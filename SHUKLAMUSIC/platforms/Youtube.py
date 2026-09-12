@@ -246,6 +246,15 @@ async def _convert_to_wav(mp3_path: str) -> str:
     return mp3_path   # fallback: stream MP3 if conversion failed
 
 
+async def _prepare_audio_cache(mp3_path: str) -> None:
+    """Prepare the low-latency WAV cache without delaying first playback."""
+    try:
+        await _convert_to_wav(mp3_path)
+        asyncio.get_running_loop().run_in_executor(None, _cleanup_wav_cache, 25)
+    except Exception as exc:
+        _LOGGER.debug("[audio-cache] background conversion skipped: %s", exc)
+
+
 def _cleanup_wav_cache(keep: int = 25) -> None:
     """
     Keep only the <keep> most-recently-used WAV files.
@@ -444,14 +453,10 @@ async def download_song(link: str) -> str:
         if not downloaded or not (os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0):
             return None
 
-    # ── 3. Pre-convert to WAV (blocks only for conversion, not download) ──
-    result = await _convert_to_wav(mp3_path)
-
-    # ── 4. Background cache housekeeping (non-blocking) ──
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, _cleanup_wav_cache, 25)
-
-    return result
+    # Start streaming the downloaded MP3 immediately. WAV conversion remains
+    # useful for subsequent plays, but it must not add seconds to /play.
+    asyncio.create_task(_prepare_audio_cache(mp3_path))
+    return mp3_path
 
 
 async def download_video(link: str) -> str:
@@ -503,19 +508,18 @@ async def download_video(link: str) -> str:
         try:
             _ytdlp_args = [
                 "yt-dlp",
-                # Prefer 1080p H.264/AVC + best audio — mweb+tv_embedded need no PO tokens.
-                # AVC (H.264) preferred over VP9/AV1 for maximum Telegram VC compatibility.
-                "-f", "bestvideo[height<=1080][ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "--merge-output-format", "mp4",
+                # Prefer a single-file 720p MP4 so /vplay can start quickly.
+                # A combined file avoids the slow video+audio merge path while
+                # remaining compatible with Telegram voice chats.
+                "-f", "best[height<=720][ext=mp4]/best[height<=720]/best[ext=mp4]/best",
                 "--no-playlist",
-            "--extractor-args", "youtube:player_client=android,mweb",
+                "--extractor-args", "youtube:player_client=android,mweb",
                 "--no-check-certificate",
                 "--geo-bypass",
-            "--socket-timeout", "10",
-            "--retries", "1",
-            "--fragment-retries", "1",
-                # Force yuv420p — prevents blue/green color artifacts in VC streams
-                "--postprocessor-args", "ffmpeg:-pix_fmt yuv420p -vf scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                "--socket-timeout", "10",
+                "--retries", "1",
+                "--fragment-retries", "1",
+                "--concurrent-fragments", "4",
             ]
             _cookies = _cookies_file()
             if _cookies:

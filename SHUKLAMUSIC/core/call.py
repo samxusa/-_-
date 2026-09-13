@@ -431,7 +431,7 @@ class Call(PyTgCalls):
                             try:
                                 details, new_vidid = await asyncio.wait_for(
                                     YouTube.related_track(last_vidid, played_ids=played_ids),
-                                    timeout=25,
+                                    timeout=50,
                                 )
                             except Exception as related_exc:
                                 LOGGER(__name__).warning(
@@ -440,7 +440,7 @@ class Call(PyTgCalls):
                         if not details and last_title:
                             try:
                                 details, new_vidid = await asyncio.wait_for(
-                                    YouTube.track(last_title), timeout=25
+                                    YouTube.track(last_title), timeout=50
                                 )
                             except Exception as search_exc:
                                 LOGGER(__name__).warning(
@@ -451,7 +451,10 @@ class Call(PyTgCalls):
                             # Inherit video/audio mode from the song that just ended
                             autoplay_video = popped.get("streamtype", "audio") == "video"
                             # Download BEFORE clearing queue to avoid losing state on failure
-                            download_timeout = 75 if autoplay_video else 60
+                            # The downloader has API, yt-dlp and loader
+                            # fallbacks. Give that bounded chain enough time,
+                            # but never allow it to stall the transition loop.
+                            download_timeout = 150 if autoplay_video else 120
                             file_path, direct = await asyncio.wait_for(
                                 YouTube.download(
                                     new_vidid, None, videoid=True, video=autoplay_video
@@ -577,11 +580,14 @@ class Call(PyTgCalls):
         elif "vid_" in queued:
             mystic = await app.send_message(original_chat_id, _["call_7"])
             try:
-                file_path, direct = await YouTube.download(
-                    videoid,
-                    mystic,
-                    videoid=True,
-                    video=video,
+                file_path, direct = await asyncio.wait_for(
+                    YouTube.download(
+                        videoid,
+                        mystic,
+                        videoid=True,
+                        video=video,
+                    ),
+                    timeout=150 if video else 120,
                 )
                 if not file_path:
                     raise ValueError("queued download returned no file")

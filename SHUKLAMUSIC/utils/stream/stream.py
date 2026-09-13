@@ -33,6 +33,23 @@ from SHUKLAMUSIC.utils.thumbnails import get_thumb
 _stream_locks = defaultdict(asyncio.Lock)
 
 
+async def _download_youtube_track(vidid, mystic, video, error_text):
+    """Bound a provider/download stall so /play never hangs indefinitely."""
+    timeout = 150 if video else 120
+    try:
+        return await asyncio.wait_for(
+            YouTube.download(
+                vidid,
+                mystic,
+                video=video,
+                videoid=True,
+            ),
+            timeout=timeout,
+        )
+    except asyncio.TimeoutError as exc:
+        raise AssistantErr(error_text) from exc
+
+
 async def stream(
     _,
     mystic,
@@ -127,8 +144,8 @@ async def _stream(
                     db[chat_id] = []
                 status = True if video else None
                 try:
-                    file_path, direct = await YouTube.download(
-                        vidid, mystic, video=status, videoid=True
+                    file_path, direct = await _download_youtube_track(
+                        vidid, mystic, status, _["play_14"]
                     )
                 except:
                     raise AssistantErr(_["play_14"])
@@ -218,8 +235,8 @@ async def _stream(
             )
             return
         try:
-            file_path, direct = await YouTube.download(
-                vidid, mystic, videoid=True, video=status
+            file_path, direct = await _download_youtube_track(
+                vidid, mystic, status, _["play_14"]
             )
         except:
             raise AssistantErr(_["play_14"])

@@ -1038,6 +1038,9 @@ class YouTubeAPI:
                 results = []
 
         if not results:
+            results = await _youtube_web_search(query, max_results=max_results)
+
+        if not results:
             def _ytdlp_search():
                 opts = _base_ydl_opts(skip_download=True, noplaylist=True)
                 with yt_dlp.YoutubeDL(opts) as ydl:

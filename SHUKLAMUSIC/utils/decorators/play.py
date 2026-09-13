@@ -114,7 +114,8 @@ def PlayWrapper(command):
             )
         url = await YouTube.url(message)
         if audio_telegram is None and video_telegram is None and url is None:
-            if len(message.command) < 2:
+            is_247 = message.command[0].lower() in {"247", "24x7"}
+            if len(message.command) < 2 and not is_247:
                 try:
                     await status.delete()
                 except Exception:

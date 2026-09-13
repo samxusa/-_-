@@ -23,6 +23,7 @@ from SHUKLAMUSIC.utils import seconds_to_min, time_to_seconds
 from SHUKLAMUSIC.utils.channelplay import get_channeplayCB
 from SHUKLAMUSIC.utils.decorators.language import languageCB
 from SHUKLAMUSIC.utils.decorators.play import PlayWrapper
+from SHUKLAMUSIC.utils.database import set_autoplay, set_autoplay_owner
 from SHUKLAMUSIC.utils.formatters import formats
 from SHUKLAMUSIC.utils.inline import (
     botplaylist_markup,
@@ -37,7 +38,7 @@ from SHUKLAMUSIC.utils.stream.stream import stream
 from config import BANNED_USERS, lyrical
 
 @app.on_message(
-   filters.command(["play", "vplay", "cplay", "cvplay", "playforce", "vplayforce", "cplayforce", "cvplayforce"] ,prefixes=["/", "!", "%", ",", "", ".", "@", "#"])
+   filters.command(["play", "vplay", "cplay", "cvplay", "playforce", "vplayforce", "cplayforce", "cvplayforce", "247", "24x7"] ,prefixes=["/", "!", "%", ",", "", ".", "@", "#"])
             
     & filters.group
     & ~BANNED_USERS
@@ -69,6 +70,23 @@ async def play_commnd(
     spotify = None
     user_id = message.from_user.id
     user_name = message.from_user.mention
+    is_247 = message.command[0].lower() in {"247", "24x7"}
+    if is_247:
+        requested = (
+            message.text.split(None, 1)[1].strip()
+            if len(message.command) > 1
+            else ""
+        )
+        if requested.lower() in {"off", "disable", "disabled"}:
+            await set_autoplay(chat_id, False)
+            return await mystic.edit_text("✅ 24×7 autoplay disabled.")
+        await set_autoplay(chat_id, True)
+        await set_autoplay_owner(chat_id, user_id)
+        if not requested:
+            return await mystic.edit_text(
+                "✅ 24×7 autoplay enabled.\n\n"
+                "अब गाना चलाने के लिए `/247 song name` या `/play song name` भेजें।"
+            )
     audio_telegram = (
         (message.reply_to_message.audio or message.reply_to_message.voice)
         if message.reply_to_message
@@ -350,7 +368,11 @@ async def play_commnd(
                 reply_markup=InlineKeyboardMarkup(buttons),
             )
         slider = True
-        query = message.text.split(None, 1)[1]
+        query = (
+            requested
+            if is_247
+            else message.text.split(None, 1)[1]
+        )
         if "-v" in query:
             query = query.replace("-v", "")
         try:

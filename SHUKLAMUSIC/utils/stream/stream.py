@@ -101,6 +101,10 @@ async def _stream(
 ):
     if not result:
         return
+    # The in-memory active flag can outlive a Telegram voice chat after a
+    # network/assistant failure. Reconcile it before queueing a new request.
+    if await is_active_chat(chat_id) and not await SHUKLA.is_call_active(chat_id):
+        await SHUKLA.reset_chat_state(chat_id)
     if forceplay:
         await SHUKLA.force_stop_stream(chat_id)
     if streamtype == "playlist":

@@ -81,6 +81,80 @@ class Call(PyTgCalls):
         # Serialize transitions per chat so they cannot pop/clear the queue
         # twice and make the assistant leave an otherwise healthy VC.
         self._transition_locks = defaultdict(asyncio.Lock)
+        self._assistant_clients = (
+            self.userbot1, self.userbot2, self.userbot3, self.userbot4,
+            self.userbot5, self.userbot6, self.userbot7,
+        )
+
+    async def _participant_ids(self, client, chat_id: int) -> set[int]:
+        participants = await asyncio.wait_for(
+            client.get_participants(chat_id), timeout=10
+        )
+        ids = set()
+        for participant in participants or []:
+            user_id = getattr(participant, "user_id", None)
+            if user_id is None:
+                peer = getattr(participant, "peer", None)
+                user_id = getattr(peer, "user_id", None)
+            if user_id is not None:
+                ids.add(int(user_id))
+        return ids
+
+    async def is_call_active(self, chat_id: int) -> bool:
+        """Confirm that Telegram still has a usable voice chat for this group."""
+        try:
+            assistant = await group_assistant(self, chat_id)
+            for attempt in range(2):
+                try:
+                    participants = await asyncio.wait_for(
+                        assistant.get_participants(chat_id), timeout=10
+                    )
+                    return bool(participants)
+                except Exception:
+                    if attempt == 0:
+                        await asyncio.sleep(0.5)
+            return False
+        except Exception:
+            return False
+
+    async def has_human_participants(
+        self, chat_id: int, client: PyTgCalls | None = None
+    ) -> bool:
+        """Return True only when someone other than our assistant is in the VC."""
+        try:
+            assistant = client or await group_assistant(self, chat_id)
+            participant_ids = await self._participant_ids(assistant, chat_id)
+            assistant_ids = set()
+            for assistant_client in self._assistant_clients:
+                me = getattr(assistant_client, "me", None)
+                user_id = getattr(me, "id", None)
+                if user_id is not None:
+                    assistant_ids.add(int(user_id))
+            bot_me = getattr(app, "me", None)
+            bot_id = getattr(bot_me, "id", None)
+            if bot_id is not None:
+                assistant_ids.add(int(bot_id))
+            return bool(participant_ids - assistant_ids)
+        except Exception as exc:
+            LOGGER(__name__).warning(
+                f"[vc] participant check failed for {chat_id}: {type(exc).__name__}: {exc}"
+            )
+            return False
+
+    async def reset_chat_state(self, chat_id: int):
+        """Drop stale queue/activity state after Telegram has lost the VC."""
+        async with self._transition_locks[chat_id]:
+            queued = list(db.get(chat_id) or [])
+            db[chat_id] = []
+            for item in queued:
+                await auto_clean(item)
+            await remove_active_video_chat(chat_id)
+            await remove_active_chat(chat_id)
+            try:
+                assistant = await group_assistant(self, chat_id)
+                await assistant.leave_call(chat_id, close=False)
+            except Exception:
+                pass
 
     def _build_stream(
         self,
@@ -115,25 +189,45 @@ class Call(PyTgCalls):
         chat_id: int,
         stream: types.MediaStream,
     ):
-        try:
-            # Never let a stalled voice-call request block /play, /skip or
-            # the stream-ended transition forever.
-            await asyncio.wait_for(
-                client.play(
-                    chat_id=chat_id,
-                    stream=stream,
-                    config=types.GroupCallConfig(auto_start=True),
-                ),
-                timeout=float(os.environ.get("PLAY_REQUEST_TIMEOUT", "25")),
-            )
-        except exceptions.NoActiveGroupCall:
-            raise
-        except exceptions.NoAudioSourceFound:
-            raise
-        except (ConnectionNotFound, TelegramServerError):
-            raise
-        except Exception:
-            raise
+        # Telegram can keep a stale PyTgCalls session around after a long
+        # idle period. Rejoin once before giving up, instead of surfacing a
+        # transient 202/connection error to the user.
+        last_exc = None
+        for attempt in range(1, 3):
+            try:
+                await asyncio.wait_for(
+                    client.play(
+                        chat_id=chat_id,
+                        stream=stream,
+                        config=types.GroupCallConfig(auto_start=True),
+                    ),
+                    timeout=float(os.environ.get("PLAY_REQUEST_TIMEOUT", "25")),
+                )
+                return
+            except exceptions.NoActiveGroupCall:
+                raise
+            except exceptions.NoAudioSourceFound:
+                raise
+            except (ConnectionNotFound, TelegramServerError) as exc:
+                last_exc = exc
+                LOGGER(__name__).warning(
+                    f"[play] attempt {attempt}/2 failed for {chat_id}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+            except Exception as exc:
+                last_exc = exc
+                LOGGER(__name__).warning(
+                    f"[play] attempt {attempt}/2 failed for {chat_id}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+            if attempt < 2:
+                try:
+                    await client.leave_call(chat_id, close=False)
+                except Exception:
+                    pass
+                await asyncio.sleep(0.75)
+        if last_exc is not None:
+            raise last_exc
 
     async def pause_stream(self, chat_id: int):
         assistant = await group_assistant(self, chat_id)
@@ -417,7 +511,11 @@ class Call(PyTgCalls):
                 await auto_clean(popped)
             if not check:
                 # ── Autoplay: queue a related track instead of leaving ──
-                if await get_autoplay(chat_id) and popped:
+                if (
+                    await get_autoplay(chat_id)
+                    and popped
+                    and await self.has_human_participants(chat_id, client)
+                ):
                     try:
                         last_title = popped.get("title", "")
                         last_vidid = popped.get("vidid", "")
@@ -463,6 +561,15 @@ class Call(PyTgCalls):
                             )
                             if not file_path:
                                 raise ValueError("Autoplay download returned None")
+                            # Do not start autoplay if the last human left while
+                            # metadata/download work was in progress.
+                            if not await self.has_human_participants(chat_id, client):
+                                await _clear_(chat_id)
+                                try:
+                                    await client.leave_call(chat_id, close=False)
+                                except Exception:
+                                    pass
+                                return
                             # Record history only after successful download
                             await add_autoplay_history(chat_id, last_vidid)
                             await add_autoplay_history(chat_id, new_vidid)

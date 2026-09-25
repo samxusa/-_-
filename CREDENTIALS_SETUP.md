@@ -13,6 +13,7 @@ in **Railway → Service → Variables**. Do not put real values in GitHub,
 | `BOT_TOKEN` | @BotFather | Create a bot token |
 | `OWNER_ID` | Telegram ID lookup | Numeric owner user ID |
 | `LOGGER_ID` | Telegram group/channel ID | The bot must be able to access it |
+| `LOG_GROUP_ID` | Optional separate Telegram log group ID | Defaults to `LOGGER_ID` when omitted |
 | `MONGO_DB_URI` | MongoDB Atlas or another MongoDB provider | Allow Railway network access |
 | `STRING_SESSION` | Generate with a trusted Pyrogram session generator | Keep private; this is a user account session |
 
@@ -25,6 +26,8 @@ voice chats and must be an administrator in the target group.
 | Variable | Enables |
 | --- | --- |
 | `YOUTUBE_API_KEY` | Faster YouTube search and metadata |
+| `BOT_USERNAME` | Optional bot username without `@` | Used for generated links; defaults to the configured bot |
+| `STRING_SESSION2` … `STRING_SESSION7` | Optional additional assistant sessions | Add only if one assistant is not enough |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Spotify search and playlists |
 | `TMDB_API_KEY` | Movie search |
 | `GROQ_API_KEY` | AI chatbot features |
@@ -43,6 +46,9 @@ optional YouTube API key is not the same thing as `BOT_TOKEN`.
 4. Railway supplies `PORT` automatically. The bot exposes `/` and `/ping` on
    that port and returns a JSON health response.
 5. Deploy and check the service logs for `Bot fully started!`.
+
+For the fastest YouTube search, set `YOUTUBE_API_KEY`. Playback does not
+require that key; it uses the built-in yt-dlp/API/loader fallback chain.
 
 Do not use a worker-only process for this service: Railway health checks need
 the web process to bind the assigned `PORT`.

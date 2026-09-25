@@ -247,6 +247,7 @@ DOWNLOAD_DIR = "downloads"
 # Prevent duplicate yt-dlp/API work when a command and a queue transition
 # request the same track at the same time.
 _download_locks: dict[tuple[str, str], asyncio.Lock] = {}
+_prefetch_tasks: dict[tuple[str, bool], asyncio.Task] = {}
 _track_locks: dict[str, asyncio.Lock] = {}
 _track_cache: dict[str, tuple[float, tuple[dict, str]]] = {}
 _TRACK_CACHE_TTL = 300
@@ -561,7 +562,9 @@ async def _download_song(link: str) -> str:
                     # Best quality audio — mweb+tv_embedded work without PO tokens
                     "-f", "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best",
                     "-x", "--audio-format", "mp3",
-                    "--audio-quality", "0",
+                    # VBR 5 encodes much faster than lossless-quality 0 while
+                    # remaining more than sufficient for voice-chat music.
+                    "--audio-quality", "5",
                     "--no-playlist",
                     "--extractor-args", "youtube:player_client=android,mweb",
                     "--no-check-certificate",
@@ -569,6 +572,7 @@ async def _download_song(link: str) -> str:
                     "--socket-timeout", "10",
                     "--retries", "1",
                     "--fragment-retries", "1",
+                    "--concurrent-fragments", "4",
                 ]
                 _cookies = _cookies_file()
                 if _cookies:
@@ -667,10 +671,10 @@ async def _download_video(link: str) -> str:
         try:
             _ytdlp_args = [
                 "yt-dlp",
-                # Prefer a single-file 720p MP4 so /vplay can start quickly.
+                # Prefer a single-file 480p MP4 so /vplay can start quickly.
                 # A combined file avoids the slow video+audio merge path while
                 # remaining compatible with Telegram voice chats.
-                "-f", "best[height<=720][ext=mp4]/best[height<=720]/best[ext=mp4]/best",
+                "-f", "best[height<=480][ext=mp4]/best[height<=720][ext=mp4]/best[height<=720]/best",
                 "--no-playlist",
                 "--extractor-args", "youtube:player_client=android,mweb",
                 "--no-check-certificate",
@@ -729,6 +733,39 @@ async def download_video(link: str) -> str:
         return await _download_video(link)
 
 
+async def prefetch(link: str, video: bool = False) -> None:
+    """Warm a track's download cache without blocking the Telegram handler."""
+    video_id = link.split("v=")[-1].split("&")[0] if "v=" in link else link
+    if not video_id or len(video_id) < 3:
+        return
+    key = (video_id, bool(video))
+    existing = _prefetch_tasks.get(key)
+    if existing and not existing.done():
+        return
+
+    async def _warm() -> None:
+        try:
+            await asyncio.wait_for(
+                YouTube.download(
+                    video_id,
+                    None,
+                    video=video,
+                    videoid=True,
+                ),
+                timeout=180 if video else 150,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            _LOGGER.debug("[prefetch] %s failed: %s", video_id, exc)
+        finally:
+            if _prefetch_tasks.get(key) is task:
+                _prefetch_tasks.pop(key, None)
+
+    task = asyncio.create_task(_warm())
+    _prefetch_tasks[key] = task
+
+
 class YouTubeAPI:
     def __init__(self):
         self.base = "https://www.youtube.com/watch?v="
@@ -736,6 +773,9 @@ class YouTubeAPI:
         self.status = "https://www.youtube.com/oembed?url="
         self.listbase = "https://youtube.com/playlist?list="
         self.reg = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+    async def prefetch(self, link: str, video: bool = False) -> None:
+        return await prefetch(link, video=video)
 
     async def exists(self, link: str, videoid: Union[bool, str] = None):
         if videoid:

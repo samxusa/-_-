@@ -230,6 +230,12 @@ async def _stream(
                 user_id,
                 "video" if video else "audio",
             )
+            # Warm the next item while the current item is playing. The
+            # queue transition will reuse the shared download cache/lock.
+            try:
+                await YouTube.prefetch(vidid, video=bool(video))
+            except Exception:
+                pass
             position = len(db.get(chat_id)) - 1
             button = aq_markup(_, chat_id)
             await app.send_message(
@@ -283,6 +289,12 @@ async def _stream(
         )
         db[chat_id][0]["mystic"] = run
         db[chat_id][0]["markup"] = "stream"
+        try:
+            # Resolve and download the next autoplay item while this one is
+            # playing, eliminating the usual end-of-track gap.
+            await SHUKLA.schedule_autoplay_prefetch(chat_id, db[chat_id][0])
+        except Exception:
+            pass
         push_history(chat_id, dict(db[chat_id][0]))
     elif streamtype == "soundcloud":
         file_path = result["filepath"]

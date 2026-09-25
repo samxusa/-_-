@@ -81,10 +81,130 @@ class Call(PyTgCalls):
         # Serialize transitions per chat so they cannot pop/clear the queue
         # twice and make the assistant leave an otherwise healthy VC.
         self._transition_locks = defaultdict(asyncio.Lock)
+        # Autoplay lookup/download runs while the current track is playing.
+        # The result is consumed by the stream-ended transition.
+        self._autoplay_prefetch_tasks = {}
+        self._autoplay_prefetch_sources = {}
+        self._autoplay_prefetch_results = {}
         self._assistant_clients = (
             self.userbot1, self.userbot2, self.userbot3, self.userbot4,
             self.userbot5, self.userbot6, self.userbot7,
         )
+
+    async def schedule_autoplay_prefetch(self, chat_id: int, item: dict):
+        """Prepare the next autoplay item in the background.
+
+        This is intentionally best-effort. The normal transition path still
+        has its own metadata and download fallback if the task is not ready.
+        """
+        if not item or not item.get("vidid"):
+            return
+        try:
+            if not await get_autoplay(chat_id):
+                return
+        except Exception:
+            return
+
+        last_vidid = item["vidid"]
+        existing = self._autoplay_prefetch_results.get(chat_id)
+        if existing and existing.get("last_vidid") == last_vidid:
+            return
+        task = self._autoplay_prefetch_tasks.get(chat_id)
+        if task and not task.done():
+            if self._autoplay_prefetch_sources.get(chat_id) == last_vidid:
+                return
+            task.cancel()
+
+        task = None
+
+        async def _prepare():
+            try:
+                played_ids = await get_autoplay_history(chat_id)
+                details, new_vidid = None, None
+                try:
+                    details, new_vidid = await asyncio.wait_for(
+                        YouTube.related_track(last_vidid, played_ids=played_ids),
+                        timeout=45,
+                    )
+                except Exception as related_exc:
+                    LOGGER(__name__).debug(
+                        f"[autoplay-prefetch] related lookup failed: {related_exc}"
+                    )
+                if not details:
+                    title = item.get("title", "")
+                    if title:
+                        try:
+                            details, new_vidid = await asyncio.wait_for(
+                                YouTube.track(title), timeout=30
+                            )
+                        except Exception as search_exc:
+                            LOGGER(__name__).debug(
+                                f"[autoplay-prefetch] title lookup failed: {search_exc}"
+                            )
+                if (
+                    not details
+                    or not new_vidid
+                    or new_vidid == last_vidid
+                    or new_vidid in played_ids
+                ):
+                    return
+
+                autoplay_video = item.get("streamtype", "audio") == "video"
+                file_path, direct = await asyncio.wait_for(
+                    YouTube.download(
+                        new_vidid,
+                        None,
+                        videoid=True,
+                        video=autoplay_video,
+                    ),
+                    timeout=150 if autoplay_video else 120,
+                )
+                if not file_path:
+                    return
+                self._autoplay_prefetch_results[chat_id] = {
+                    "last_vidid": last_vidid,
+                    "details": details,
+                    "new_vidid": new_vidid,
+                    "file_path": file_path,
+                    "direct": direct,
+                    "video": autoplay_video,
+                }
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                LOGGER(__name__).debug(
+                    f"[autoplay-prefetch] failed for chat {chat_id}: {exc}"
+                )
+            finally:
+                if self._autoplay_prefetch_tasks.get(chat_id) is task:
+                    self._autoplay_prefetch_tasks.pop(chat_id, None)
+                    self._autoplay_prefetch_sources.pop(chat_id, None)
+
+        self._autoplay_prefetch_sources[chat_id] = last_vidid
+        task = asyncio.create_task(_prepare())
+        self._autoplay_prefetch_tasks[chat_id] = task
+
+    async def _take_autoplay_prefetch(self, chat_id: int, last_vidid: str):
+        """Return a prepared autoplay item, waiting briefly if needed."""
+        result = self._autoplay_prefetch_results.get(chat_id)
+        if result and result.get("last_vidid") == last_vidid:
+            self._autoplay_prefetch_results.pop(chat_id, None)
+            return result
+
+        task = self._autoplay_prefetch_tasks.get(chat_id)
+        if task and not task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=15)
+            except asyncio.TimeoutError:
+                task.cancel()
+                return None
+            except Exception:
+                return None
+        result = self._autoplay_prefetch_results.get(chat_id)
+        if result and result.get("last_vidid") == last_vidid:
+            self._autoplay_prefetch_results.pop(chat_id, None)
+            return result
+        return None
 
     async def _participant_ids(self, client, chat_id: int) -> set[int]:
         participants = await asyncio.wait_for(
@@ -523,42 +643,61 @@ class Call(PyTgCalls):
                         language_ap = await get_lang(chat_id)
                         _ap = get_string(language_ap)
                         played_ids = await get_autoplay_history(chat_id)
-                        # Prefer Radio-playlist related songs; fall back to title search
-                        details, new_vidid = None, None
-                        if last_vidid:
-                            try:
-                                details, new_vidid = await asyncio.wait_for(
-                                    YouTube.related_track(last_vidid, played_ids=played_ids),
-                                    timeout=50,
-                                )
-                            except Exception as related_exc:
-                                LOGGER(__name__).warning(
-                                    f"[autoplay] related-track lookup failed: {type(related_exc).__name__}: {related_exc}"
-                                )
-                        if not details and last_title:
-                            try:
-                                details, new_vidid = await asyncio.wait_for(
-                                    YouTube.track(last_title), timeout=50
-                                )
-                            except Exception as search_exc:
-                                LOGGER(__name__).warning(
-                                    f"[autoplay] title fallback failed: {type(search_exc).__name__}: {search_exc}"
-                                )
+                        # Prefer a result prepared during the previous track.
+                        prepared = await self._take_autoplay_prefetch(
+                            chat_id, last_vidid
+                        )
+                        file_path, direct = None, False
+                        if prepared:
+                            details = prepared["details"]
+                            new_vidid = prepared["new_vidid"]
+                            file_path = prepared["file_path"]
+                            direct = prepared["direct"]
+                        else:
+                            # Prefer Radio-playlist related songs; fall back to
+                            # title search when the background task was not ready.
+                            details, new_vidid = None, None
+                            if last_vidid:
+                                try:
+                                    details, new_vidid = await asyncio.wait_for(
+                                        YouTube.related_track(
+                                            last_vidid, played_ids=played_ids
+                                        ),
+                                        timeout=50,
+                                    )
+                                except Exception as related_exc:
+                                    LOGGER(__name__).warning(
+                                        f"[autoplay] related-track lookup failed: "
+                                        f"{type(related_exc).__name__}: {related_exc}"
+                                    )
+                            if not details and last_title:
+                                try:
+                                    details, new_vidid = await asyncio.wait_for(
+                                        YouTube.track(last_title), timeout=50
+                                    )
+                                except Exception as search_exc:
+                                    LOGGER(__name__).warning(
+                                        f"[autoplay] title fallback failed: "
+                                        f"{type(search_exc).__name__}: {search_exc}"
+                                    )
                         if details and new_vidid and new_vidid != last_vidid and new_vidid not in played_ids:
                             from SHUKLAMUSIC.utils.stream.queue import put_queue
                             # Inherit video/audio mode from the song that just ended
                             autoplay_video = popped.get("streamtype", "audio") == "video"
-                            # Download BEFORE clearing queue to avoid losing state on failure
-                            # The downloader has API, yt-dlp and loader
-                            # fallbacks. Give that bounded chain enough time,
-                            # but never allow it to stall the transition loop.
-                            download_timeout = 150 if autoplay_video else 120
-                            file_path, direct = await asyncio.wait_for(
-                                YouTube.download(
-                                    new_vidid, None, videoid=True, video=autoplay_video
-                                ),
-                                timeout=download_timeout,
-                            )
+                            # Download BEFORE clearing queue to avoid losing
+                            # state on failure. A background result is already
+                            # cached in the common case.
+                            if not file_path:
+                                download_timeout = 150 if autoplay_video else 120
+                                file_path, direct = await asyncio.wait_for(
+                                    YouTube.download(
+                                        new_vidid,
+                                        None,
+                                        videoid=True,
+                                        video=autoplay_video,
+                                    ),
+                                    timeout=download_timeout,
+                                )
                             if not file_path:
                                 raise ValueError("Autoplay download returned None")
                             # Do not start autoplay if the last human left while
@@ -624,6 +763,12 @@ class Call(PyTgCalls):
                             try:
                                 if db.get(chat_id):
                                     push_history(chat_id, dict(db[chat_id][0]))
+                            except Exception:
+                                pass
+                            try:
+                                await self.schedule_autoplay_prefetch(
+                                    chat_id, db[chat_id][0]
+                                )
                             except Exception:
                                 pass
                             return
@@ -731,6 +876,10 @@ class Call(PyTgCalls):
             )
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "stream"
+            try:
+                await self.schedule_autoplay_prefetch(chat_id, db[chat_id][0])
+            except Exception:
+                pass
 
         elif "index_" in queued:
             stream = self._build_stream(videoid, video=video)

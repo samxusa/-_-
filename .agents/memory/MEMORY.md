@@ -1,3 +1,5 @@
 - [Telegram channel additions](telegram-channel-additions.md) — channel bot installs need ChatMemberUpdated handling; new_chat_members alone is not reliable.
 - [Telegram sticker pack names](telegram-sticker-pack-names.md) — generate short names from the running bot username and always end with `_by_<bot_username>`.
 - [Pyrogram event loop](pyrogram-event-loop.md) — create and run Pyrogram clients on the same event loop; asyncio.run() can break reconnects.
+- [Replit secret precedence](replit-secret-precedence.md) — hardcoded values in .replit userenv can override secure secrets and break Telegram authentication.
+- [GitHub connector pushes](github-connector-pushes.md) — when shell git credentials are unavailable, push repository changes through the connector’s Git Data API.

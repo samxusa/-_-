@@ -74,6 +74,33 @@ async def ban_user(user_id, first_name, admin_id, admin_name, chat_id, reason, t
         msg_text += f"{ke(_KE_FIRE,'🔥')} <b>ᴛɪᴍᴇ :</b> <code>{time}</code>\n"
     return msg_text, True
 
+async def kick_user(user_id, first_name, admin_id, admin_name, chat_id, reason=None):
+    """Remove a member without leaving a permanent ban in place."""
+    try:
+        await app.ban_chat_member(chat_id, user_id)
+        await app.unban_chat_member(chat_id, user_id)
+    except ChatAdminRequired:
+        return "Make sure that you have given me that right", False
+    except UserAdminInvalid:
+        return "I won't kick an admin bruh!!", False
+    except BadRequest as e:
+        return f"Oops!!\n{e}", False
+    except Exception as e:
+        if user_id == 6824607634:
+            return "Why should I kick myself? Sorry but I'm not stupid like you", False
+        return f"Oops!!\n{e}", False
+
+    user_mention = mention(user_id, first_name)
+    admin_mention = mention(admin_id, admin_name)
+    msg_text = (
+        f"{ke(_KE_SKULL,'💀')} {ke(_KE_ANGRY,'🚪')} <b>ᴜsᴇʀ ᴋɪᴄᴋᴇᴅ</b>\n\n"
+        f"{ke(_KE_BLOCK,'🚫')} <b>ᴜsᴇʀ :</b> {user_mention}\n"
+        f"{ke(_KE_CROWN,'👑')} <b>ᴀᴅᴍɪɴ :</b> {admin_mention}\n"
+    )
+    if reason:
+        msg_text += f"{ke(_KE_WARN,'⚠️')} <b>ʀᴇᴀsᴏɴ :</b> <code>{reason}</code>\n"
+    return msg_text, True
+
 async def unban_user(user_id, first_name, admin_id, admin_name, chat_id):
     try:
         await app.unban_chat_member(chat_id, user_id)
@@ -210,6 +237,60 @@ async def unban_command_handler(client, message):
         await message.reply_text(msg_text)
     else:
         await message.reply_text(f"{ke(_KE_BLOCK,'🚫')} <b>ʏᴏᴜ ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴜɴʙᴀɴ sᴏᴍᴇᴏɴᴇ</b>")
+
+@app.on_message(filters.command(["kick", "out", "nikaal", "nikal"]))
+async def kick_command_handler(client, message):
+    chat = message.chat
+    chat_id = chat.id
+    admin = message.from_user
+    if not admin:
+        return await message.reply_text("Please use this command from your own admin account.")
+
+    member = await chat.get_member(admin.id)
+    privileges = member.privileges
+    can_restrict = (
+        member.status == enums.ChatMemberStatus.OWNER
+        or (
+            member.status == enums.ChatMemberStatus.ADMINISTRATOR
+            and privileges
+            and privileges.can_restrict_members
+        )
+    )
+    if not can_restrict:
+        return await message.reply_text(
+            f"{ke(_KE_BLOCK,'🚫')} <b>ʏᴏᴜ ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴋɪᴄᴋ sᴏᴍᴇᴏɴᴇ</b>"
+        )
+
+    target = message.reply_to_message.from_user if message.reply_to_message else None
+    if target:
+        user_id = target.id
+        first_name = target.first_name
+        reason = message.text.split(None, 1)[1] if len(message.command) > 1 else None
+    elif len(message.command) > 1:
+        target_arg = message.command[1]
+        try:
+            user_id = int(target_arg)
+            first_name = "User"
+        except (TypeError, ValueError):
+            user_obj = await get_userid_from_username(target_arg.lstrip("@"))
+            if not user_obj:
+                return await message.reply_text("I can't find that user")
+            user_id, first_name = user_obj
+        reason = message.text.partition(target_arg)[2].strip() or None
+    else:
+        return await message.reply_text(
+            "Please reply to a user's message or specify a username/user ID."
+        )
+
+    msg_text, _ = await kick_user(
+        user_id,
+        first_name,
+        admin.id,
+        admin.first_name,
+        chat_id,
+        reason,
+    )
+    await message.reply_text(msg_text)
 
 @app.on_message(filters.command(["mute"]))
 async def mute_command_handler(client, message):

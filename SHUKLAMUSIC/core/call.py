@@ -471,7 +471,10 @@ class Call(PyTgCalls):
             failed = queue.pop(0)
             await auto_clean(failed)
         if queue:
-            return await self._change_stream(client, chat_id)
+            # The failed item is already removed above. Do not pop the next
+            # valid item again while recovering, or every download/stream
+            # failure would skip two songs from the queue.
+            return await self._change_stream(client, chat_id, pop_current=False)
         await _clear_(chat_id)
         try:
             await client.leave_call(chat_id, close=False)
@@ -973,6 +976,7 @@ class Call(PyTgCalls):
 
     async def start(self):
         LOGGER(__name__).info("Starting PyTgCalls Client...\n")
+        started = 0
         for label, configured, client in (
             ("One", config.STRING1, self.one),
             ("Two", config.STRING2, self.two),
@@ -986,6 +990,10 @@ class Call(PyTgCalls):
                 continue
             try:
                 await asyncio.wait_for(client.start(), timeout=45)
+                started += 1
+                LOGGER(__name__).info(
+                    f"PyTgCalls assistant {label} started successfully."
+                )
             except asyncio.TimeoutError:
                 LOGGER(__name__).error(
                     f"PyTgCalls assistant {label} startup timed out; "
@@ -996,6 +1004,9 @@ class Call(PyTgCalls):
                     f"PyTgCalls assistant {label} failed to start: "
                     f"{type(exc).__name__}: {exc}"
                 )
+        LOGGER(__name__).info(
+            f"PyTgCalls ready: {started} assistant(s) started."
+        )
 
     async def decorators(self):
         for string, client in [

@@ -4,8 +4,10 @@
 import asyncio
 import importlib
 import os
+import time
 from aiohttp import web
 from pyrogram import idle
+from pyrogram.handlers import ErrorHandler
 from pytgcalls.exceptions import NoActiveGroupCall
 import config
 from SHUKLAMUSIC import LOGGER, app, userbot
@@ -23,8 +25,78 @@ _runtime_state = {
     "stage": "booting",
     "bot": "ARES X GOD",
     "failed_plugins": [],
+    "assistant_count": 0,
+    "voice_assistant_count": 0,
 }
 _keepalive_runner = None
+_last_error_reports = {}
+
+
+async def _report_handler_error(client, exception, handler, update, users, chats):
+    handler_name = type(handler).__name__
+    error_name = type(exception).__name__
+    LOGGER("SHUKLAMUSIC.updates").error(
+        "Telegram update handler %s failed: %s: %s",
+        handler_name,
+        error_name,
+        exception,
+        exc_info=(type(exception), exception, exception.__traceback__),
+    )
+
+    # Send actionable error notices to the configured log chat without
+    # forwarding message text, user data, or other private update contents.
+    if not config.LOGGER_ID:
+        return
+    key = (handler_name, error_name)
+    now = time.monotonic()
+    if now - _last_error_reports.get(key, 0) < 300:
+        return
+    _last_error_reports[key] = now
+    try:
+        await client.send_message(
+            config.LOGGER_ID,
+            "⚠️ <b>Telegram handler error</b>\n"
+            f"Handler: <code>{handler_name}</code>\n"
+            f"Error: <code>{error_name}</code>\n"
+            "Details are available in the bot workflow logs.",
+        )
+    except Exception as send_error:
+        LOGGER("SHUKLAMUSIC.updates").warning(
+            "Could not deliver handler error to LOGGER_ID: %s: %s",
+            type(send_error).__name__,
+            send_error,
+        )
+
+
+async def _send_startup_report():
+    if not config.LOGGER_ID:
+        LOGGER("SHUKLAMUSIC").warning(
+            "LOGGER_ID is not configured; startup report cannot be sent."
+        )
+        return
+    status = _runtime_state["status"].upper()
+    try:
+        await asyncio.wait_for(
+            app.send_message(
+                config.LOGGER_ID,
+                "✅ <b>Music bot startup check</b>\n"
+                f"Bot: @{_runtime_state['bot']}\n"
+                f"Status: <b>{status}</b>\n"
+                f"Assistants: <code>{_runtime_state['assistant_count']}</code>\n"
+                "Voice clients: "
+                f"<code>{_runtime_state['voice_assistant_count']}</code>",
+            ),
+            timeout=10,
+        )
+        LOGGER("SHUKLAMUSIC").info(
+            "Startup report delivered to LOGGER_ID (%s).", status
+        )
+    except Exception as exc:
+        LOGGER("SHUKLAMUSIC").warning(
+            "Startup report could not be delivered to LOGGER_ID: %s: %s",
+            type(exc).__name__,
+            exc,
+        )
 
 
 async def _ping(request):
@@ -119,10 +191,17 @@ async def init():
         LOGGER("SHUKLAMUSIC.core.commands").warning(
             f"Command menu registration failed; message handlers remain active: {type(exc).__name__}: {exc}"
         )
+    app.add_handler(ErrorHandler(_report_handler_error))
     _runtime_state["stage"] = "assistants_starting"
     await userbot.start()
+    _runtime_state["assistant_count"] = getattr(
+        userbot, "started_assistants", 0
+    )
     _runtime_state["stage"] = "voice_starting"
     await SHUKLA.start()
+    _runtime_state["voice_assistant_count"] = getattr(
+        SHUKLA, "started_voice_assistants", 0
+    )
     # Do not join/play a boot-time test stream. It adds latency and can fail
     # startup when LOGGER_ID is unavailable, even though the bot is healthy.
     await SHUKLA.decorators()
@@ -133,8 +212,29 @@ async def init():
         await restore_dynamic_sessions()
     except Exception:
         pass
-    _runtime_state.update({"status": "ready", "stage": "ready", "bot": getattr(app, "username", "unknown")})
-    LOGGER("SHUKLAMUSIC").info("Bot fully started!")
+    voice_ready = (
+        _runtime_state["assistant_count"] > 0
+        and _runtime_state["voice_assistant_count"] > 0
+    )
+    _runtime_state.update({
+        "status": "ready" if voice_ready else "degraded",
+        "stage": "ready" if voice_ready else "voice_unavailable",
+        "bot": getattr(app, "username", "unknown"),
+    })
+    if voice_ready:
+        LOGGER("SHUKLAMUSIC").info(
+            "Bot fully started with %s assistant(s) and %s voice client(s).",
+            _runtime_state["assistant_count"],
+            _runtime_state["voice_assistant_count"],
+        )
+    else:
+        LOGGER("SHUKLAMUSIC").error(
+            "Bot started without a working voice assistant (assistants=%s, "
+            "voice_clients=%s); music commands may not work.",
+            _runtime_state["assistant_count"],
+            _runtime_state["voice_assistant_count"],
+        )
+    await _send_startup_report()
     await idle()
     await app.stop()
     await userbot.stop()

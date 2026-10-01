@@ -53,7 +53,15 @@ async def _save_state():
 
 
 async def _heartbeat_loop():
-    await _load_state()
+    try:
+        await _load_state()
+    except Exception as exc:
+        _LOG.warning(
+            "Could not load heartbeat settings; keeping the default state: "
+            "%s: %s",
+            type(exc).__name__,
+            exc,
+        )
     await asyncio.sleep(60)   # wait 1 min after startup before first beat
     beat = 0
     while True:
@@ -69,8 +77,13 @@ async def _heartbeat_loop():
                     f"<i>Next ping in {HEARTBEAT_INTERVAL // 60} min • use /heartbeat off to mute</i>"
                 )
                 await app.send_message(config.LOGGER_ID, text)
-        except Exception:
-            pass
+                _LOG.info("Heartbeat notification %s sent to LOGGER_ID.", beat)
+        except Exception as exc:
+            _LOG.warning(
+                "Heartbeat notification failed: %s: %s",
+                type(exc).__name__,
+                exc,
+            )
         await asyncio.sleep(HEARTBEAT_INTERVAL)
 
 

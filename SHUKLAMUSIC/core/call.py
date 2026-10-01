@@ -1007,6 +1007,7 @@ class Call(PyTgCalls):
         LOGGER(__name__).info(
             f"PyTgCalls ready: {started} assistant(s) started."
         )
+        self.started_voice_assistants = started
 
     async def decorators(self):
         for string, client in [

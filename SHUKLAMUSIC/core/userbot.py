@@ -103,12 +103,18 @@ class Userbot(Client):
         LOGGER(__name__).info("Starting Assistants without automatic chat joins...")
         assistants.clear()
         assistantids.clear()
+        started = 0
         for number, client, session, label in self._assistant_specs():
             if not session:
                 continue
-            await self._start_assistant(number, client, label)
+            if await self._start_assistant(number, client, label):
+                started += 1
             # Keep Telegram auth/start requests spaced out across sessions.
             await asyncio.sleep(1)
+        self.started_assistants = started
+        LOGGER(__name__).info(
+            f"Assistant startup complete: {started} assistant(s) ready."
+        )
 
     async def stop(self):
         LOGGER(__name__).info("Stopping Assistants...")
